@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String
+  password   String?
+  avatar     String?
+  role       UserRole @default(USER)
+  active     Boolean  @default(true)
+  provider   String   @default("local")
+  providerId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  farms Farm[]
+
+  @@map("users")
+}
+
+model PlatformSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model Farm {
+  id                   String   @id @default(cuid())
+  name                 String
+  userId               String
+  electricityRate      Float    @default(0.12)
+  laborRate            Float    @default(60)
+  targetProfitMargin   Float    @default(50)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxRates         TaxRate[]
+  printers         Printer[]
+  filaments        Filament[]
+  salesPlatforms   SalesPlatform[]
+  shippingProfiles ShippingProfile[]
+  models           Model3D[]
+
+  @@map("farms")
+}
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  farmId    String
+  name      String
+  rate      Float
+  createdAt DateTime @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("tax_rates")
+}
+
+model Printer {
+  id               String   @id @default(cuid())
+  farmId           String
+  brand            String
+  model            String
+  powerConsumption Float    @default(200)
+  imageUrl         String?
+  preselected      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("printers")
+}
+
+model Filament {
+  id           String   @id @default(cuid())
+  farmId       String
+  brand        String
+  material     String
+  variant      String
+  costPerSpool Float    @default(19.99)
+  spoolWeight  Float    @default(1000)
+  colors       Json     @default("[]")
+  createdAt    DateTime @default(now())
+
+  farm   Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  models Model3D[]
+
+  @@map("filaments")
+}
+
+enum UserRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum PlatformType {
+  ETSY
+  AMAZON
+  SHOPIFY
+  TIKTOK
+  EBAY
+  CUSTOM
+}
+
+model SalesPlatform {
+  id         String       @id @default(cuid())
+  farmId     String
+  type       PlatformType
+  shopName   String
+  feesConfig Json         @default("{}")
+  enabled    Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("sales_platforms")
+}
+
+model ShippingProfile {
+  id              String   @id @default(cuid())
+  farmId          String
+  name            String
+  customerPays    Float    @default(5.99)
+  postageCost     Float    @default(5.00)
+  deliveryMinDays Int      @default(3)
+  deliveryMaxDays Int      @default(5)
+  createdAt       DateTime @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_profiles")
+}
+
+model Model3D {
+  id                 String   @id @default(cuid())
+  farmId             String
+  name               String
+  fileName           String
+  printTimeMinutes   Float
+  filamentUsageGrams Float
+  filamentId         String?
+  calculatedCost     Float
+  suggestedPrice     Float
+  createdAt          DateTime @default(now())
+
+  farm     Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  filament Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
+
+  @@map("models_3d")
+}
