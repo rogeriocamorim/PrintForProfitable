@@ -11,6 +11,12 @@ import Step3Sales from './pages/wizard/Step3Sales'
 import Step4Model from './pages/wizard/Step4Model'
 import DashboardLayout from './pages/dashboard/DashboardLayout'
 import Dashboard from './pages/dashboard/Dashboard'
+import Models from './pages/dashboard/Models'
+import Printers from './pages/dashboard/Printers'
+import Filaments from './pages/dashboard/Filaments'
+import Marketplaces from './pages/dashboard/Marketplaces'
+import Shipping from './pages/dashboard/Shipping'
+import FarmSettings from './pages/dashboard/FarmSettings'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
@@ -55,7 +61,12 @@ function App() {
             }
           >
             <Route index element={<Dashboard />} />
-            <Route path="*" element={<Dashboard />} />
+            <Route path="models" element={<Models />} />
+            <Route path="printers" element={<Printers />} />
+            <Route path="filaments" element={<Filaments />} />
+            <Route path="marketplaces" element={<Marketplaces />} />
+            <Route path="shipping" element={<Shipping />} />
+            <Route path="settings" element={<FarmSettings />} />
           </Route>
 
           <Route
