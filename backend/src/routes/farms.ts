@@ -70,4 +70,45 @@ router.put("/", async (req: Request, res: Response) => {
   }
 });
 
+// POST /tax-rates - Add a tax rate
+router.post("/tax-rates", async (req: Request, res: Response) => {
+  try {
+    const farm = await prisma.farm.findFirst({ where: { userId: req.user!.id } });
+    if (!farm) { res.status(404).json({ error: "Farm not found" }); return; }
+
+    const { name, rate } = req.body;
+    if (!name || rate === undefined) {
+      res.status(400).json({ error: "Name and rate are required" });
+      return;
+    }
+
+    const taxRate = await prisma.taxRate.create({
+      data: { farmId: farm.id, name, rate },
+    });
+    res.status(201).json(taxRate);
+  } catch (err) {
+    console.error("Create tax rate error:", err);
+    res.status(500).json({ error: "Failed to create tax rate" });
+  }
+});
+
+// DELETE /tax-rates/:id - Delete a tax rate
+router.delete("/tax-rates/:id", async (req: Request, res: Response) => {
+  try {
+    const farm = await prisma.farm.findFirst({ where: { userId: req.user!.id } });
+    if (!farm) { res.status(404).json({ error: "Farm not found" }); return; }
+
+    const existing = await prisma.taxRate.findFirst({
+      where: { id: req.params.id, farmId: farm.id },
+    });
+    if (!existing) { res.status(404).json({ error: "Tax rate not found" }); return; }
+
+    await prisma.taxRate.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (err) {
+    console.error("Delete tax rate error:", err);
+    res.status(500).json({ error: "Failed to delete tax rate" });
+  }
+});
+
 export default router;

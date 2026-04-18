@@ -11,6 +11,10 @@ import farmRoutes from "./routes/farms";
 import wizardRoutes from "./routes/wizard";
 import modelRoutes from "./routes/models";
 import adminRoutes from "./routes/admin";
+import printerRoutes from "./routes/printers";
+import filamentRoutes from "./routes/filaments";
+import platformRoutes from "./routes/platforms";
+import shippingRoutes from "./routes/shipping";
 import path from "path";
 import fs from "fs";
 
@@ -57,6 +61,10 @@ app.use("/api/farms", farmRoutes);
 app.use("/api/wizard", wizardRoutes);
 app.use("/api/models", modelRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/printers", printerRoutes);
+app.use("/api/filaments", filamentRoutes);
+app.use("/api/platforms", platformRoutes);
+app.use("/api/shipping", shippingRoutes);
 
 // Health check
 app.get("/api/health", (_req: Request, res: Response) => {
