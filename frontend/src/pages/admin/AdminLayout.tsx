@@ -31,7 +31,7 @@ export default function AdminLayout() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 cursor-pointer"
+          className="hidden lg:flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700/70 transition-colors cursor-pointer"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
@@ -49,10 +49,10 @@ export default function AdminLayout() {
               to={item.path}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150',
                 active
-                  ? 'bg-primary/20 text-primary'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white',
+                  ? 'bg-primary/15 text-primary shadow-xs'
+                  : 'text-slate-400 hover:bg-slate-700/70 hover:text-white',
               )}
             >
               <item.icon className="h-5 w-5 shrink-0" />
@@ -65,7 +65,7 @@ export default function AdminLayout() {
       <div className="border-t border-slate-700 p-3">
         <Link
           to="/dashboard"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-400 hover:bg-slate-700/70 hover:text-white transition-all duration-150"
         >
           <ArrowLeft className="h-5 w-5 shrink-0" />
           {!collapsed && 'Back to Dashboard'}
@@ -78,7 +78,7 @@ export default function AdminLayout() {
     <div className="flex h-screen bg-slate-900">
       {/* Impersonation banner */}
       {isImpersonating && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 text-center py-1 text-sm font-medium">
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-amber-950 text-center py-1.5 text-sm font-medium shadow-elevated">
           Impersonating user — {' '}
           <button onClick={stopImpersonation} className="underline font-bold cursor-pointer">
             Stop Impersonation
@@ -88,7 +88,7 @@ export default function AdminLayout() {
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] lg:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
       {/* Sidebar - mobile */}
@@ -104,8 +104,8 @@ export default function AdminLayout() {
       {/* Sidebar - desktop */}
       <aside
         className={cn(
-          'hidden lg:flex flex-col bg-slate-800 shrink-0 transition-all',
-          collapsed ? 'w-16' : 'w-64',
+          'hidden lg:flex flex-col bg-slate-800 shrink-0 transition-all duration-200',
+          collapsed ? 'w-16' : 'w-60',
         )}
       >
         <SidebarContent />

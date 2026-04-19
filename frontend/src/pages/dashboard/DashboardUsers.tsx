@@ -5,7 +5,7 @@ export default function DashboardUsers() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+        <h1 className="text-2xl font-bold text-foreground">Users</h1>
         <p className="text-sm text-muted mt-1">Manage team members and their access to your farm</p>
       </div>
       <EmptyState

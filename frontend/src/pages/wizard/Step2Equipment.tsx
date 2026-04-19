@@ -92,8 +92,8 @@ export default function Step2Equipment() {
     <div className="mx-auto max-w-5xl px-6 py-12">
       <div className="grid gap-12 lg:grid-cols-2">
         <div className="flex flex-col justify-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Add your equipment</h1>
-          <p className="text-muted text-lg">
+          <h1 className="text-3xl font-bold text-foreground mb-3 tracking-tight">Add your equipment</h1>
+          <p className="text-muted text-lg leading-relaxed">
             Add your printers and filaments so we can calculate accurate material and energy costs for each print.
           </p>
         </div>
@@ -101,9 +101,9 @@ export default function Step2Equipment() {
         <div className="space-y-6">
           {/* Printers */}
           <Card>
-            <CardContent className="py-6">
+            <CardContent>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900">Printers</h3>
+                <h3 className="text-sm font-semibold text-foreground">Printers</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addPrinter}>
                   <Plus className="h-4 w-4" /> Add Printer
                 </Button>
@@ -113,7 +113,7 @@ export default function Step2Equipment() {
               ) : (
                 <div className="space-y-4">
                   {printers.map((p) => (
-                    <div key={p.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div key={p.id} className="rounded-lg border border-border p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div className="grid grid-cols-2 gap-3 flex-1">
                           <Input
@@ -128,7 +128,7 @@ export default function Step2Equipment() {
                           />
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => removePrinter(p.id)}>
-                          <Trash2 className="h-4 w-4 text-gray-400" />
+                          <Trash2 className="h-4 w-4 text-muted" />
                         </Button>
                       </div>
                       <Input
@@ -148,22 +148,22 @@ export default function Step2Equipment() {
 
           {/* Filaments */}
           <Card>
-            <CardContent className="py-6">
+            <CardContent>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900">Filaments</h3>
+                <h3 className="text-sm font-semibold text-foreground">Filaments</h3>
               </div>
               {filaments.length === 0 ? (
                 <p className="text-sm text-muted text-center py-4">No filaments added yet</p>
               ) : (
                 <div className="space-y-4">
                   {filaments.map((f) => (
-                    <div key={f.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div key={f.id} className="rounded-lg border border-border p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div className="grid grid-cols-2 gap-3 flex-1">
                           <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">Material</label>
+                            <label className="block text-sm font-medium text-foreground">Material</label>
                             <select
-                              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                              className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
                               value={f.materialType}
                               onChange={(e) => updateFilament(f.id, 'materialType', e.target.value)}
                             >
@@ -183,19 +183,19 @@ export default function Step2Equipment() {
                           />
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => removeFilament(f.id)} className="mt-6">
-                          <Trash2 className="h-4 w-4 text-gray-400" />
+                          <Trash2 className="h-4 w-4 text-muted" />
                         </Button>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Color</label>
+                        <label className="block text-sm font-medium text-foreground mb-1.5">Color</label>
                         <div className="flex flex-wrap gap-2">
                           {COLORS.map((c) => (
                             <button
                               key={c}
                               type="button"
                               onClick={() => updateFilament(f.id, 'color', c)}
-                              className={`h-7 w-7 rounded-full border-2 cursor-pointer transition-transform ${
-                                f.color === c ? 'border-primary scale-110' : 'border-gray-200'
+                              className={`h-7 w-7 rounded-full border-2 cursor-pointer transition-all duration-150 ${
+                                f.color === c ? 'border-primary scale-110 shadow-xs' : 'border-border hover:border-muted'
                               }`}
                               style={{ backgroundColor: c }}
                             />
@@ -228,7 +228,7 @@ export default function Step2Equipment() {
               <button
                 type="button"
                 onClick={addFilament}
-                className="mt-4 text-sm font-medium text-primary hover:text-primary-hover cursor-pointer"
+                className="mt-4 text-sm font-medium text-primary hover:text-primary-hover transition-colors cursor-pointer"
               >
                 + Manually Add Filament
               </button>
@@ -243,7 +243,7 @@ export default function Step2Equipment() {
               <button
                 type="button"
                 onClick={() => navigate('/setup/sales')}
-                className="text-sm text-muted hover:text-gray-700 cursor-pointer"
+                className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
               >
                 I'll set this up later
               </button>

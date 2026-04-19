@@ -114,7 +114,7 @@ export default function FarmSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Farm Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">Farm Settings</h1>
         <p className="text-sm text-muted mt-1">Manage your farm's pricing parameters and tax rates</p>
       </div>
 
@@ -129,7 +129,7 @@ export default function FarmSettings() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-gray-900">General Settings</h2>
+              <h2 className="text-lg font-semibold text-foreground">General Settings</h2>
             </div>
           </CardHeader>
           <CardContent>
@@ -175,19 +175,19 @@ export default function FarmSettings() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Tax Rates</h2>
+            <h2 className="text-lg font-semibold text-foreground">Tax Rates</h2>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {farm?.taxRates.map((tax) => (
-                <div key={tax.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                <div key={tax.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
                   <div>
-                    <span className="text-sm font-medium text-gray-900">{tax.name}</span>
+                    <span className="text-sm font-medium text-foreground">{tax.name}</span>
                     <span className="ml-2 text-sm text-muted">{tax.rate}%</span>
                   </div>
                   <button
                     onClick={() => removeTaxRate(tax.id)}
-                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                    className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

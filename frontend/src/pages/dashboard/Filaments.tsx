@@ -94,7 +94,7 @@ export default function Filaments() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Filaments</h1>
+          <h1 className="text-2xl font-bold text-foreground">Filaments</h1>
           <p className="text-sm text-muted mt-1">{filaments.length} filament{filaments.length !== 1 ? 's' : ''}</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Filament</Button>
@@ -126,7 +126,7 @@ export default function Filaments() {
             <TableBody>
               {filaments.map((f) => (
                 <TableRow key={f.id}>
-                  <TableCell className="font-medium text-gray-900">{f.brand}</TableCell>
+                  <TableCell className="font-medium text-foreground">{f.brand}</TableCell>
                   <TableCell><Badge variant={materialColors[f.material] ?? 'default'}>{f.material}</Badge></TableCell>
                   <TableCell>{f.variant}</TableCell>
                   <TableCell className="text-right">${f.costPerSpool.toFixed(2)}</TableCell>
@@ -134,8 +134,8 @@ export default function Filaments() {
                   <TableCell className="text-right text-muted">${(f.costPerSpool / f.spoolWeight).toFixed(4)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(f)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(f.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(f)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(f.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -149,9 +149,9 @@ export default function Filaments() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} required placeholder="e.g. Bambu Lab" />
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">Material</label>
+            <label className="block text-sm font-medium text-foreground">Material</label>
             <select
-              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
               value={form.material}
               onChange={(e) => setForm({ ...form, material: e.target.value })}
             >

@@ -5,7 +5,7 @@ export default function Supplies() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Supplies</h1>
+        <h1 className="text-2xl font-bold text-foreground">Supplies</h1>
         <p className="text-sm text-muted mt-1">Track packaging materials, hardware, and other consumables</p>
       </div>
       <EmptyState

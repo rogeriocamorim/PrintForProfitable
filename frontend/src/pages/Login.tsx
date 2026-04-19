@@ -30,17 +30,17 @@ export default function Login() {
     <div className="flex min-h-screen">
       {/* Left branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-dark flex-col justify-center px-16">
-        <h1 className="text-4xl font-bold text-white mb-4">
+        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
           Print<span className="text-primary">For</span>Profitable
         </h1>
-        <p className="text-lg text-gray-400 max-w-md">
+        <p className="text-lg text-muted max-w-md leading-relaxed">
           The all-in-one platform to manage your 3D print farm, track costs, and maximize your profits.
         </p>
       </div>
 
       {/* Right form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12 bg-gray-50">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12 bg-surface-raised">
+        <div className="w-full max-w-sm space-y-6">
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-2xl font-bold text-dark">
               Print<span className="text-primary">For</span>Profitable
@@ -48,7 +48,7 @@ export default function Login() {
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h2>
             <p className="mt-1 text-sm text-muted">Sign in to your account to continue</p>
           </div>
 
@@ -84,10 +84,10 @@ export default function Login() {
             <>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
+                  <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-gray-50 px-4 text-muted">or continue with</span>
+                  <span className="bg-surface-raised px-4 text-muted">or continue with</span>
                 </div>
               </div>
 
@@ -117,7 +117,7 @@ export default function Login() {
 
           <p className="text-center text-sm text-muted">
             Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-primary hover:text-primary-hover">
+            <Link to="/register" className="font-medium text-primary hover:text-primary-hover transition-colors">
               Sign up
             </Link>
           </p>

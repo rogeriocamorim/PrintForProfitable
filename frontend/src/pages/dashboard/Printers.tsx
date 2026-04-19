@@ -8,6 +8,39 @@ import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Plus, Trash2, Pencil, Loader2, Cpu } from 'lucide-react'
 
+interface PrinterPreset {
+  brand: string
+  model: string
+  powerConsumption: number
+}
+
+const PRINTER_PRESETS: PrinterPreset[] = [
+  // Bambu Lab
+  { brand: 'Bambu Lab', model: 'A1 Mini', powerConsumption: 100 },
+  { brand: 'Bambu Lab', model: 'A1', powerConsumption: 120 },
+  { brand: 'Bambu Lab', model: 'P1P', powerConsumption: 150 },
+  { brand: 'Bambu Lab', model: 'P1S', powerConsumption: 150 },
+  { brand: 'Bambu Lab', model: 'X1', powerConsumption: 180 },
+  { brand: 'Bambu Lab', model: 'X1C', powerConsumption: 180 },
+  { brand: 'Bambu Lab', model: 'X1E', powerConsumption: 200 },
+  { brand: 'Bambu Lab', model: 'P2S', powerConsumption: 200 },
+  { brand: 'Bambu Lab', model: 'X2D', powerConsumption: 250 },
+  { brand: 'Bambu Lab', model: 'H2C', powerConsumption: 200 },
+  // Prusa
+  { brand: 'Prusa', model: 'Mini+', powerConsumption: 80 },
+  { brand: 'Prusa', model: 'MK3S+', powerConsumption: 120 },
+  { brand: 'Prusa', model: 'MK4S', powerConsumption: 120 },
+  // Creality
+  { brand: 'Creality', model: 'Ender 3 V3', powerConsumption: 150 },
+  { brand: 'Creality', model: 'K1', powerConsumption: 150 },
+  { brand: 'Creality', model: 'K1 Max', powerConsumption: 200 },
+  // Voron
+  { brand: 'Voron', model: '2.4 (350mm)', powerConsumption: 250 },
+  // Elegoo
+  { brand: 'Elegoo', model: 'Neptune 4', powerConsumption: 150 },
+  { brand: 'Elegoo', model: 'Saturn 3 Ultra (Resin)', powerConsumption: 60 },
+]
+
 interface Printer {
   id: string
   brand: string
@@ -83,7 +116,7 @@ export default function Printers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Printers</h1>
+          <h1 className="text-2xl font-bold text-foreground">Printers</h1>
           <p className="text-sm text-muted mt-1">{printers.length} printer{printers.length !== 1 ? 's' : ''}</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Printer</Button>
@@ -112,13 +145,13 @@ export default function Printers() {
             <TableBody>
               {printers.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium text-gray-900">{p.brand}</TableCell>
+                  <TableCell className="font-medium text-foreground">{p.brand}</TableCell>
                   <TableCell>{p.model}</TableCell>
                   <TableCell className="text-right">{p.powerConsumption}W</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(p)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(p)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -130,6 +163,43 @@ export default function Printers() {
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit Printer' : 'Add Printer'}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!editing && (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">Quick Select Preset</label>
+              <select
+                className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                value=""
+                onChange={(e) => {
+                  const preset = PRINTER_PRESETS[parseInt(e.target.value)]
+                  if (preset) {
+                    setForm({
+                      brand: preset.brand,
+                      model: preset.model,
+                      powerConsumption: String(preset.powerConsumption),
+                    })
+                  }
+                }}
+              >
+                <option value="">Choose a printer or fill manually...</option>
+                {(() => {
+                  const groups: Record<string, { preset: PrinterPreset; index: number }[]> = {}
+                  PRINTER_PRESETS.forEach((p, i) => {
+                    if (!groups[p.brand]) groups[p.brand] = []
+                    groups[p.brand].push({ preset: p, index: i })
+                  })
+                  return Object.entries(groups).map(([brand, items]) => (
+                    <optgroup key={brand} label={brand}>
+                      {items.map(({ preset, index }) => (
+                        <option key={index} value={index}>
+                          {preset.model} — {preset.powerConsumption}W avg
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                })()}
+              </select>
+            </div>
+          )}
           <Input label="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} required placeholder="e.g. Bambu Lab" />
           <Input label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} required placeholder="e.g. X1 Carbon" />
           <Input label="Power Consumption" type="number" suffix="watts" value={form.powerConsumption} onChange={(e) => setForm({ ...form, powerConsumption: e.target.value })} required />

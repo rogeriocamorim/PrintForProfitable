@@ -5,7 +5,7 @@ export default function PrintQueue() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Print Queue</h1>
+        <h1 className="text-2xl font-bold text-foreground">Print Queue</h1>
         <p className="text-sm text-muted mt-1">Manage your print jobs and printer assignments</p>
       </div>
       <EmptyState

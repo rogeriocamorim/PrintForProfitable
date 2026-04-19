@@ -52,7 +52,7 @@ export default function AdminDashboard() {
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {STAT_CARDS.map((card) => (
-          <div key={card.key} className="rounded-xl bg-slate-800 border border-slate-700 p-5">
+          <div key={card.key} className="rounded-xl bg-slate-800 border border-slate-700 p-5 transition-colors duration-200">
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.color}/20`}>
                 <card.icon className={`h-5 w-5 text-${card.color.replace('bg-', '')}`} />
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
         </div>
         <div className="divide-y divide-slate-700">
           {stats.recentUsers.map((u) => (
-            <div key={u.id} className="flex items-center justify-between px-5 py-3">
+            <div key={u.id} className="flex items-center justify-between px-5 py-3 transition-colors duration-150 hover:bg-slate-750">
               <div>
                 <p className="text-sm font-medium text-white">{u.name}</p>
                 <p className="text-xs text-slate-400">{u.email}</p>

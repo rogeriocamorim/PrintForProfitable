@@ -98,7 +98,7 @@ export default function Marketplaces() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Marketplaces</h1>
+          <h1 className="text-2xl font-bold text-foreground">Marketplaces</h1>
           <p className="text-sm text-muted mt-1">{platforms.length} platform{platforms.length !== 1 ? 's' : ''}</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Platform</Button>
@@ -128,7 +128,7 @@ export default function Marketplaces() {
               {platforms.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell><Badge variant={platformBadge[p.type] ?? 'default'}>{p.type}</Badge></TableCell>
-                  <TableCell className="font-medium text-gray-900">{p.shopName}</TableCell>
+                  <TableCell className="font-medium text-foreground">{p.shopName}</TableCell>
                   <TableCell>
                     <button onClick={() => toggleEnabled(p)} className="cursor-pointer">
                       <Badge variant={p.enabled ? 'success' : 'default'}>{p.enabled ? 'Active' : 'Disabled'}</Badge>
@@ -136,8 +136,8 @@ export default function Marketplaces() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(p)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(p)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -150,9 +150,9 @@ export default function Marketplaces() {
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit Platform' : 'Add Platform'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">Platform Type</label>
+            <label className="block text-sm font-medium text-foreground">Platform Type</label>
             <select
-              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
             >

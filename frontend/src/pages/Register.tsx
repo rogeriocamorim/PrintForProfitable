@@ -30,16 +30,16 @@ export default function Register() {
   return (
     <div className="flex min-h-screen">
       <div className="hidden lg:flex lg:w-1/2 bg-dark flex-col justify-center px-16">
-        <h1 className="text-4xl font-bold text-white mb-4">
+        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
           Print<span className="text-primary">For</span>Profitable
         </h1>
-        <p className="text-lg text-gray-400 max-w-md">
+        <p className="text-lg text-muted max-w-md leading-relaxed">
           Start tracking your 3D printing costs and profits in minutes. Set up your farm, add your equipment, and let us handle the math.
         </p>
       </div>
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12 bg-gray-50">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12 bg-surface-raised">
+        <div className="w-full max-w-sm space-y-6">
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-2xl font-bold text-dark">
               Print<span className="text-primary">For</span>Profitable
@@ -47,7 +47,7 @@ export default function Register() {
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Create your account</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Create your account</h2>
             <p className="mt-1 text-sm text-muted">Get started with your print farm in minutes</p>
           </div>
 
@@ -91,10 +91,10 @@ export default function Register() {
             <>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
+                  <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-gray-50 px-4 text-muted">or continue with</span>
+                  <span className="bg-surface-raised px-4 text-muted">or continue with</span>
                 </div>
               </div>
 
@@ -124,7 +124,7 @@ export default function Register() {
 
           <p className="text-center text-sm text-muted">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-primary hover:text-primary-hover">
+            <Link to="/login" className="font-medium text-primary hover:text-primary-hover transition-colors">
               Sign in
             </Link>
           </p>

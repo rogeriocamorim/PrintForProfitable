@@ -141,14 +141,14 @@ export default function AdminUsers() {
                             <button
                               onClick={() => toggleRole(u.id, u.role)}
                               title={u.role === 'SUPER_ADMIN' ? 'Demote to User' : 'Promote to Admin'}
-                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white cursor-pointer"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors duration-150 cursor-pointer"
                             >
                               <Shield className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => toggleActive(u.id, u.active)}
                               title={u.active ? 'Deactivate' : 'Activate'}
-                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white cursor-pointer"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors duration-150 cursor-pointer"
                             >
                               {u.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                             </button>
@@ -156,7 +156,7 @@ export default function AdminUsers() {
                               <button
                                 onClick={() => impersonate(u.id)}
                                 title="Impersonate"
-                                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary cursor-pointer"
+                                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary transition-colors duration-150 cursor-pointer"
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
@@ -185,14 +185,14 @@ export default function AdminUsers() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 cursor-pointer"
+                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 transition-colors duration-150 cursor-pointer"
               >
                 Previous
               </button>
               <button
                 disabled={page >= data.totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 cursor-pointer"
+                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 transition-colors duration-150 cursor-pointer"
               >
                 Next
               </button>

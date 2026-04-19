@@ -64,17 +64,15 @@ export default function Step1Farm() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
       <div className="grid gap-12 lg:grid-cols-2">
-        {/* Left description */}
         <div className="flex flex-col justify-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Set up your farm</h1>
-          <p className="text-muted text-lg">
+          <h1 className="text-3xl font-bold text-foreground mb-3 tracking-tight">Set up your farm</h1>
+          <p className="text-muted text-lg leading-relaxed">
             Tell us about your print farm so we can calculate accurate costs and help you price your products profitably.
           </p>
         </div>
 
-        {/* Right form */}
         <Card>
-          <CardContent className="py-6">
+          <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <Input
                 label="Farm Name"
@@ -85,7 +83,7 @@ export default function Step1Farm() {
               />
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Cost Defaults</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Cost Defaults</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="Electricity Rate"
@@ -112,11 +110,11 @@ export default function Step1Farm() {
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Sales Tax Rates</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Sales Tax Rates</h3>
                   <button
                     type="button"
                     onClick={addTaxRate}
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary-hover cursor-pointer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
                   >
                     <Plus className="h-4 w-4" /> Add
                   </button>
@@ -147,7 +145,7 @@ export default function Step1Farm() {
                         size="icon"
                         onClick={() => removeTaxRate(tax.id)}
                       >
-                        <Trash2 className="h-4 w-4 text-gray-400" />
+                        <Trash2 className="h-4 w-4 text-muted" />
                       </Button>
                     </div>
                   ))}
@@ -155,7 +153,7 @@ export default function Step1Farm() {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Pricing Goal</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Pricing Goal</h3>
                 <Input
                   label="Target Profit Margin"
                   type="number"

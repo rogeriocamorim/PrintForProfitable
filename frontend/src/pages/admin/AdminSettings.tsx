@@ -80,7 +80,7 @@ export default function AdminSettings() {
                 onClick={() => {
                   setSettings({ ...settings, [key]: !settings[key] })
                 }}
-                className={`relative h-6 w-11 rounded-full transition-colors cursor-pointer ${
+                className={`relative h-6 w-11 rounded-full transition-colors duration-200 cursor-pointer ${
                   settings[key] ? 'bg-primary' : 'bg-slate-600'
                 }`}
               >
@@ -93,7 +93,7 @@ export default function AdminSettings() {
               <button
                 onClick={() => saveSetting(key)}
                 disabled={saving === key}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary cursor-pointer"
+                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary transition-colors duration-150 cursor-pointer"
               >
                 <Save className="h-4 w-4" />
               </button>
@@ -123,7 +123,7 @@ export default function AdminSettings() {
               <button
                 onClick={() => saveSetting(key)}
                 disabled={saving === key}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary cursor-pointer"
+                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-primary transition-colors duration-150 cursor-pointer"
               >
                 <Save className="h-4 w-4" />
               </button>

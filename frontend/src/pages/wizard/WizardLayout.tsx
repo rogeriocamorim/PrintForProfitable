@@ -13,27 +13,25 @@ export default function WizardLayout() {
   const progress = (currentStep / steps.length) * 100
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-raised">
       {/* Progress bar */}
-      <div className="h-1 bg-gray-200">
+      <div className="h-1 bg-border-light">
         <div
-          className="h-full bg-primary transition-all duration-500"
+          className="h-full bg-primary transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
 
       {/* Step indicator */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-border bg-white">
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-dark">
-                Print<span className="text-primary">For</span>Profitable
-              </span>
-            </div>
+            <span className="text-lg font-bold text-dark">
+              Print<span className="text-primary">For</span>Profitable
+            </span>
             <div className="flex items-center gap-2 text-sm text-muted">
               Step {currentStep} of {steps.length}
-              <span className="font-medium text-gray-900">{steps[currentStep - 1]?.label}</span>
+              <span className="font-medium text-foreground">{steps[currentStep - 1]?.label}</span>
             </div>
           </div>
         </div>

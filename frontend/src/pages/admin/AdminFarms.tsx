@@ -102,14 +102,14 @@ export default function AdminFarms() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 cursor-pointer"
+                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 transition-colors duration-150 cursor-pointer"
               >
                 Previous
               </button>
               <button
                 disabled={page >= data.totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 cursor-pointer"
+                className="rounded px-3 py-1 text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-40 transition-colors duration-150 cursor-pointer"
               >
                 Next
               </button>

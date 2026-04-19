@@ -112,8 +112,8 @@ export default function Step3Sales() {
     <div className="mx-auto max-w-5xl px-6 py-12">
       <div className="grid gap-12 lg:grid-cols-2">
         <div className="flex flex-col justify-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Sales & Shipping</h1>
-          <p className="text-muted text-lg">
+          <h1 className="text-3xl font-bold text-foreground mb-3 tracking-tight">Sales & Shipping</h1>
+          <p className="text-muted text-lg leading-relaxed">
             Connect your sales platform so we can factor in marketplace fees and shipping costs into your pricing.
           </p>
         </div>
@@ -121,8 +121,8 @@ export default function Step3Sales() {
         <div className="space-y-6">
           {/* Platform selector */}
           <Card>
-            <CardContent className="py-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Sales Platform</h3>
+            <CardContent>
+              <h3 className="text-sm font-semibold text-foreground mb-4">Sales Platform</h3>
               <div className="grid grid-cols-3 gap-3">
                 {PLATFORMS.map((p) => {
                   const Icon = p.icon
@@ -131,13 +131,13 @@ export default function Step3Sales() {
                       key={p.id}
                       type="button"
                       onClick={() => setSelectedPlatform(p.id)}
-                      className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-sm font-medium transition-colors cursor-pointer ${
+                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all duration-150 cursor-pointer ${
                         selectedPlatform === p.id
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          ? 'border-primary bg-primary/5 text-primary shadow-xs'
+                          : 'border-border text-muted hover:border-muted hover:text-foreground'
                       }`}
                     >
-                      <Icon className="h-6 w-6" />
+                      <Icon className="h-5 w-5" />
                       {p.name}
                     </button>
                   )
@@ -152,7 +152,7 @@ export default function Step3Sales() {
                     value={shopName}
                     onChange={(e) => setShopName(e.target.value)}
                   />
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+                  <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
                     <p className="text-sm font-medium text-blue-900">Platform Fees</p>
                     <p className="text-sm text-blue-700 mt-1">{platform.fees}</p>
                   </div>
@@ -163,8 +163,8 @@ export default function Step3Sales() {
 
           {/* Shipping */}
           <Card>
-            <CardContent className="py-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Shipping Profile</h3>
+            <CardContent>
+              <h3 className="text-sm font-semibold text-foreground mb-4">Shipping Profile</h3>
               <div className="space-y-4">
                 <Input
                   label="Profile Name"
@@ -193,7 +193,7 @@ export default function Step3Sales() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Delivery Estimate</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Delivery Estimate</label>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
@@ -214,7 +214,7 @@ export default function Step3Sales() {
               </div>
               <button
                 type="button"
-                className="mt-4 text-sm text-muted hover:text-gray-700 cursor-pointer"
+                className="mt-4 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
               >
                 Selling in person only?
               </button>

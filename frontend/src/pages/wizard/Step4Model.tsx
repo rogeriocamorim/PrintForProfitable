@@ -58,49 +58,49 @@ export default function Step4Model() {
     <div className="mx-auto max-w-5xl px-6 py-12">
       <div className="grid gap-12 lg:grid-cols-2">
         <div className="flex flex-col justify-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Upload your first model</h1>
-          <p className="text-muted text-lg">
+          <h1 className="text-3xl font-bold text-foreground mb-3 tracking-tight">Upload your first model</h1>
+          <p className="text-muted text-lg leading-relaxed">
             Upload a 3D model file so we can analyze it and generate a cost breakdown for your first product.
           </p>
         </div>
 
         <div className="space-y-6">
           <Card>
-            <CardContent className="py-6">
+            <CardContent>
               <div
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
-                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center transition-colors ${
+                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center transition-all duration-200 ${
                   dragActive
-                    ? 'border-primary bg-primary/5'
+                    ? 'border-primary bg-primary/5 scale-[1.01]'
                     : file
-                      ? 'border-green-400 bg-green-50'
-                      : 'border-gray-300 hover:border-gray-400'
+                      ? 'border-emerald-400 bg-emerald-50'
+                      : 'border-border hover:border-muted'
                 }`}
               >
-                <Upload className={`mb-4 h-10 w-10 ${file ? 'text-green-500' : 'text-gray-400'}`} />
+                <Upload className={`mb-4 h-10 w-10 ${file ? 'text-emerald-500' : 'text-muted'}`} />
                 {file ? (
                   <>
-                    <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                    <p className="text-sm font-medium text-foreground">{file.name}</p>
                     <p className="mt-1 text-xs text-muted">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                     <button
                       type="button"
                       onClick={() => setFile(null)}
-                      className="mt-2 text-sm text-primary hover:text-primary-hover cursor-pointer"
+                      className="mt-2 text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
                     >
                       Remove
                     </button>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-foreground">
                       Drag and drop your model file here
                     </p>
-                    <label className="mt-2 text-sm text-primary hover:text-primary-hover cursor-pointer">
+                    <label className="mt-2 text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer">
                       or browse to upload
                       <input
                         type="file"
@@ -138,7 +138,7 @@ export default function Step4Model() {
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
-                className="text-sm text-muted hover:text-gray-700 cursor-pointer"
+                className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
               >
                 Skip and add a model later
               </button>

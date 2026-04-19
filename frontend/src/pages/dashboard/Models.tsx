@@ -229,7 +229,7 @@ export default function Models() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">3D Models</h1>
+          <h1 className="text-2xl font-bold text-foreground">3D Models</h1>
           <p className="text-sm text-muted mt-1">{models.length} model{models.length !== 1 ? 's' : ''}</p>
         </div>
         <Button onClick={() => { resetForm(); setShowAdd(true) }}>
@@ -266,7 +266,7 @@ export default function Models() {
             <TableBody>
               {models.map((model) => (
                 <TableRow key={model.id}>
-                  <TableCell className="font-medium text-gray-900">{model.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">{model.name}</TableCell>
                   <TableCell>
                     {model.slicer ? (
                       <Badge variant="info">{model.slicer}</Badge>
@@ -289,10 +289,10 @@ export default function Models() {
                   <TableCell className="text-right font-medium text-primary">${model.suggestedPrice.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => viewDetail(model.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                      <button onClick={() => viewDetail(model.id)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground">
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button onClick={() => handleDelete(model.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500">
+                      <button onClick={() => handleDelete(model.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -307,13 +307,13 @@ export default function Models() {
       {/* Add Model Modal */}
       <Modal open={showAdd} onClose={() => { setShowAdd(false); resetForm() }} title="Add Model">
         {/* Mode Toggle */}
-        <div className="flex rounded-lg border border-gray-200 p-1 mb-4">
+        <div className="flex rounded-lg border border-border p-1 mb-4">
           <button
             type="button"
             className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
               mode === 'upload'
                 ? 'bg-primary text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                : 'text-muted hover:text-foreground'
             }`}
             onClick={() => setMode('upload')}
           >
@@ -324,7 +324,7 @@ export default function Models() {
             className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
               mode === 'manual'
                 ? 'bg-primary text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                : 'text-muted hover:text-foreground'
             }`}
             onClick={() => setMode('manual')}
           >
@@ -340,7 +340,7 @@ export default function Models() {
                 className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
                   parseResult
                     ? 'border-green-300 bg-green-50'
-                    : 'border-gray-300 hover:border-primary hover:bg-orange-50/30'
+                    : 'border-border hover:border-primary hover:bg-orange-50/30'
                 } ${uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -354,14 +354,14 @@ export default function Models() {
                 {uploading ? (
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                    <p className="text-sm font-medium text-gray-700">Parsing file...</p>
+                    <p className="text-sm font-medium text-foreground">Parsing file...</p>
                   </>
                 ) : parseResult ? (
                   <>
                     <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
-                    <p className="text-sm font-medium text-gray-900">{parseResult.fileName}</p>
+                    <p className="text-sm font-medium text-foreground">{parseResult.fileName}</p>
                     {parseResult.slicer && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted mt-1">
                         Detected: {parseResult.slicer}
                         {parseResult.printTimeMinutes != null && parseResult.filamentUsageGrams != null && (
                           <> — {formatTime(parseResult.printTimeMinutes)}, {parseResult.filamentUsageGrams}g</>
@@ -374,13 +374,13 @@ export default function Models() {
                         {parseResult.parseError}
                       </p>
                     )}
-                    <p className="text-xs text-gray-400 mt-2">Click to replace</p>
+                    <p className="text-xs text-muted mt-2">Click to replace</p>
                   </>
                 ) : (
                   <>
-                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-700">Drop a .3mf file or click to browse</p>
-                    <p className="text-xs text-gray-400 mt-1">Print time & filament usage will be extracted automatically</p>
+                    <Upload className="h-8 w-8 text-muted mb-2" />
+                    <p className="text-sm font-medium text-foreground">Drop a .3mf file or click to browse</p>
+                    <p className="text-xs text-muted mt-1">Print time & filament usage will be extracted automatically</p>
                   </>
                 )}
               </div>
@@ -419,9 +419,9 @@ export default function Models() {
             required
           />
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">Filament</label>
+            <label className="block text-sm font-medium text-foreground">Filament</label>
             <select
-              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
               value={form.filamentId}
               onChange={(e) => setForm({ ...form, filamentId: e.target.value })}
             >
@@ -450,13 +450,13 @@ export default function Models() {
         {detail && (
           <div className="space-y-4">
             <div>
-              <h3 className="font-semibold text-gray-900">{detail.name}</h3>
+              <h3 className="font-semibold text-foreground">{detail.name}</h3>
               <p className="text-sm text-muted">
                 {formatTime(detail.printTimeMinutes)} &middot; {detail.filamentUsageGrams}g
                 {detail.slicer && <> &middot; <span className="text-blue-600">{detail.slicer}</span></>}
               </p>
             </div>
-            <div className="space-y-2 rounded-lg bg-gray-50 p-4 text-sm">
+            <div className="space-y-2 rounded-lg bg-surface-raised p-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted">Material Cost</span>
                 <span>${detail.pricing.materialCost.toFixed(2)}</span>
@@ -469,7 +469,7 @@ export default function Models() {
                 <span className="text-muted">Labor Cost</span>
                 <span>${detail.pricing.laborCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between border-t border-gray-200 pt-2">
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted">Base Cost</span>
                 <span className="font-medium">${detail.pricing.baseCost.toFixed(2)}</span>
               </div>
@@ -481,7 +481,7 @@ export default function Models() {
                 <span className="text-muted">Total Cost</span>
                 <span className="font-medium">${detail.pricing.totalCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between border-t border-gray-200 pt-2">
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted">Profit Margin</span>
                 <span>{detail.pricing.profitMargin}%</span>
               </div>

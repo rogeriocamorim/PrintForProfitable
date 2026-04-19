@@ -88,7 +88,7 @@ export default function Shipping() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Shipping Profiles</h1>
+          <h1 className="text-2xl font-bold text-foreground">Shipping Profiles</h1>
           <p className="text-sm text-muted mt-1">{profiles.length} profile{profiles.length !== 1 ? 's' : ''}</p>
         </div>
         <Button onClick={openAdd}><Plus className="h-4 w-4" /> Add Profile</Button>
@@ -118,14 +118,14 @@ export default function Shipping() {
             <TableBody>
               {profiles.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium text-gray-900">{p.name}</TableCell>
+                  <TableCell className="font-medium text-foreground">{p.name}</TableCell>
                   <TableCell className="text-right">${p.customerPays.toFixed(2)}</TableCell>
                   <TableCell className="text-right">${p.postageCost.toFixed(2)}</TableCell>
                   <TableCell className="text-right text-muted">{p.deliveryMinDays}-{p.deliveryMaxDays} days</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(p)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(p)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(p.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </TableCell>
                 </TableRow>
