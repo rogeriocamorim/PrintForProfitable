@@ -43,9 +43,9 @@ export default function FarmSettings() {
       setFarm(data)
       setForm({
         name: data.name,
-        electricityRate: String(data.electricityRate),
-        laborRate: String(data.laborRate),
-        targetProfitMargin: String(data.targetProfitMargin),
+        electricityRate: String(parseFloat(data.electricityRate.toFixed(4))),
+        laborRate: String(parseFloat(data.laborRate.toFixed(2))),
+        targetProfitMargin: String(parseFloat(data.targetProfitMargin.toFixed(2))),
       })
     } catch {
       setMessage('Failed to load farm settings')
