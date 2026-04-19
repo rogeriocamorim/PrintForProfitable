@@ -17,6 +17,12 @@ import Filaments from './pages/dashboard/Filaments'
 import Marketplaces from './pages/dashboard/Marketplaces'
 import Shipping from './pages/dashboard/Shipping'
 import FarmSettings from './pages/dashboard/FarmSettings'
+import Analytics from './pages/dashboard/Analytics'
+import Orders from './pages/dashboard/Orders'
+import PrintQueue from './pages/dashboard/PrintQueue'
+import DashboardUsers from './pages/dashboard/DashboardUsers'
+import Supplies from './pages/dashboard/Supplies'
+import Integrations from './pages/dashboard/Integrations'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
@@ -67,6 +73,12 @@ function App() {
             <Route path="marketplaces" element={<Marketplaces />} />
             <Route path="shipping" element={<Shipping />} />
             <Route path="settings" element={<FarmSettings />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="queue" element={<PrintQueue />} />
+            <Route path="users" element={<DashboardUsers />} />
+            <Route path="supplies" element={<Supplies />} />
+            <Route path="integrations" element={<Integrations />} />
           </Route>
 
           <Route
