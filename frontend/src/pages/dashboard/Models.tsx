@@ -92,6 +92,7 @@ export default function Models() {
   const [uploading, setUploading] = useState(false)
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
   const [form, setForm] = useState({
     name: '',
     printTimeMinutes: '',
@@ -116,13 +117,32 @@ export default function Models() {
     setForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '', printerId: '' })
     setParseResult(null)
     setMode('upload')
+    setDragOver(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    await processFile(file)
+  }
 
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    // Update the file input so handleCreate can re-read it
+    if (fileInputRef.current) {
+      const dt = new DataTransfer()
+      dt.items.add(file)
+      fileInputRef.current.files = dt.files
+    }
+    processFile(file)
+  }
+
+  async function processFile(file: File) {
     setUploading(true)
     setParseResult(null)
 
@@ -384,9 +404,15 @@ export default function Models() {
                 className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
                   parseResult
                     ? 'border-green-300 bg-green-50'
-                    : 'border-border hover:border-primary hover:bg-orange-50/30'
+                    : dragOver
+                      ? 'border-primary bg-orange-50/50'
+                      : 'border-border hover:border-primary hover:bg-orange-50/30'
                 } ${uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
+                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
+                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
+                onDrop={handleDrop}
               >
                 <input
                   ref={fileInputRef}
