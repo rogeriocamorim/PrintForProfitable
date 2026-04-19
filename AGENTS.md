@@ -32,18 +32,25 @@ backend/
   src/routes/auth.ts            # register, login, /me, /providers, OAuth
   src/routes/admin.ts           # stop-impersonation ABOVE requireSuperAdmin middleware
   src/routes/wizard.ts          # 4-step setup
-  src/routes/farms.ts           # Farm CRUD
-  src/routes/models.ts          # Model CRUD + file upload
+  src/routes/farms.ts           # Farm CRUD + tax-rates POST/DELETE
+  src/routes/models.ts          # Model CRUD + file upload + pricing breakdown
+  src/routes/printers.ts        # Printer CRUD
+  src/routes/filaments.ts       # Filament CRUD
+  src/routes/platforms.ts       # Sales platform CRUD
+  src/routes/shipping.ts        # Shipping profile CRUD
   src/services/passport.ts      # Strategies (local + conditional Google/GitHub)
 
 frontend/
   vite.config.ts                # /api proxy, @tailwindcss/vite plugin
-  src/App.tsx                   # Router with /admin/* routes
+  src/App.tsx                   # Router with /dashboard/* and /admin/* routes
   src/contexts/AuthContext.tsx   # Auth + impersonation + stopImpersonation
   src/components/AdminRoute.tsx  # Super admin guard
+  src/components/ui/            # Button, Input, Card, Table, Modal, Badge, Select, EmptyState
   src/pages/admin/              # AdminDashboard, AdminUsers, AdminFarms, AdminSettings
   src/pages/wizard/             # Steps 1-4 + WizardLayout
-  src/pages/dashboard/          # Dashboard + DashboardLayout (has impersonation banner)
+  src/pages/dashboard/          # 13 pages: Dashboard, Models, Printers, Filaments,
+                                #   Marketplaces, Shipping, FarmSettings + 6 placeholders
+                                #   (Analytics, Orders, PrintQueue, Users, Supplies, Integrations)
 ```
 
 ## Dev commands
@@ -85,12 +92,16 @@ Price     = Total / (1 - margin/100) + platform_fees + tax
 - Full auth (local + conditional OAuth), register → 4-step wizard → dashboard
 - Dashboard with collapsible sidebar, dark navy/orange theme (#E8622C), Ubuntu font
 - Admin: stats, user CRUD (search/pagination/role/active), farm listing, impersonation, settings
-- Reusable UI: Button (CVA), Input (prefix/suffix), Card
+- Reusable UI: Button (CVA), Input (prefix/suffix), Card, Table, Modal, Badge, Select, EmptyState
 - Docker Compose (postgres + backend + frontend/nginx), ARM64 compatible
+- Backend CRUD routes: printers, filaments, platforms, shipping, farms/tax-rates
+- 7 functional dashboard pages: Dashboard, Models, Printers, Filaments, Marketplaces, Shipping, FarmSettings
+- 6 placeholder pages: Analytics, Orders, PrintQueue, Users, Supplies, Integrations
+- All sidebar links wired to real routes (no dead links)
 
 ## What's next
 
-- Build out dashboard pages (currently placeholders)
-- .3mf file parser
-- Batch pricing, order tracking, analytics charts
+- .3mf file parser (extract print time, filament usage from uploads)
+- Batch pricing (price multiple models across platforms)
+- Order tracking, analytics charts, inventory tracking
 - Test OAuth with real credentials
