@@ -1,11 +1,15 @@
 import AdmZip from "adm-zip";
 import { XMLParser } from "fast-xml-parser";
+import path from "path";
+import fs from "fs";
 
 export interface ThreeMFMetadata {
   printTimeMinutes: number | null;
   filamentUsageGrams: number | null;
   filamentType: string | null;
   slicer: string | null;
+  /** Thumbnail image buffer extracted from .3mf (PNG) */
+  thumbnail: Buffer | null;
   /** Multiple plates in BambuStudio — aggregate totals */
   plates: PlateInfo[];
 }
@@ -34,6 +38,7 @@ export function parseThreeMF(filePath: string): ThreeMFMetadata {
     filamentUsageGrams: null,
     filamentType: null,
     slicer: null,
+    thumbnail: null,
     plates: [],
   };
 
@@ -41,6 +46,22 @@ export function parseThreeMF(filePath: string): ThreeMFMetadata {
   const entryMap = new Map<string, AdmZip.IZipEntry>();
   for (const entry of entries) {
     entryMap.set(entry.entryName, entry);
+  }
+
+  // Extract thumbnail — try common paths across slicers
+  const thumbnailPaths = [
+    "Metadata/plate_1.png",         // BambuStudio
+    "Metadata/plate_no_light_1.png", // BambuStudio (no-light variant)
+    "Metadata/thumbnail.png",        // PrusaSlicer
+    "thumbnail/thumbnail.png",       // Generic
+    "Metadata/top_1.png",            // BambuStudio top view
+  ];
+  for (const tp of thumbnailPaths) {
+    const entry = entryMap.get(tp);
+    if (entry) {
+      result.thumbnail = entry.getData();
+      break;
+    }
   }
 
   // Try each parser in order of popularity
@@ -132,8 +153,38 @@ function tryBambuStudio(
 
   for (let i = 0; i < plates.length; i++) {
     const plate = plates[i];
-    const prediction = parseFloat(plate["@_prediction"] || plate.prediction || "0");
-    const weight = parseFloat(plate["@_weight"] || plate.weight || "0");
+
+    // BambuStudio stores plate-level data in two formats:
+    // 1. Attributes on <plate>: <plate prediction="10327" weight="85.08">
+    // 2. Child <metadata> elements: <metadata key="prediction" value="10327"/>
+    // We need to handle both.
+    let prediction = parseFloat(plate["@_prediction"] || plate.prediction || "0");
+    let weight = parseFloat(plate["@_weight"] || plate.weight || "0");
+
+    // Extract from <metadata key="..." value="..."/> children
+    if (prediction === 0 || weight === 0) {
+      const metadataArr = plate.metadata
+        ? Array.isArray(plate.metadata)
+          ? plate.metadata
+          : [plate.metadata]
+        : [];
+      for (const m of metadataArr) {
+        const key = m["@_key"];
+        const val = m["@_value"];
+        if (key === "prediction" && prediction === 0) prediction = parseFloat(val || "0");
+        if (key === "weight" && weight === 0) weight = parseFloat(val || "0");
+      }
+    }
+
+    // Also sum filament used_g from <filament> children (more accurate for multi-filament)
+    if (plate.filament) {
+      const filaments = Array.isArray(plate.filament) ? plate.filament : [plate.filament];
+      const filamentWeight = filaments.reduce(
+        (sum: number, f: any) => sum + parseFloat(f["@_used_g"] || "0"),
+        0
+      );
+      if (filamentWeight > 0) weight = filamentWeight;
+    }
 
     const plateMinutes = prediction / 60;
     totalTime += plateMinutes;

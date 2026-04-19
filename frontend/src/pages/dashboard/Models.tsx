@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { Plus, Trash2, Eye, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Eye, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle, Image as ImageIcon, Store } from 'lucide-react'
 
 interface Filament {
   id: string
@@ -18,21 +18,41 @@ interface Filament {
   spoolWeight: number
 }
 
+interface Printer {
+  id: string
+  brand: string
+  model: string
+  powerConsumption: number
+}
+
+interface PlatformPricing {
+  platformId: string
+  platformType: string
+  shopName: string
+  platformFees: number
+  sellingPrice: number
+  profit: number
+  profitMargin: number
+}
+
 interface Model3D {
   id: string
   name: string
   fileName: string
   originalFileName: string | null
   slicer: string | null
+  thumbnailUrl: string | null
   printTimeMinutes: number
   filamentUsageGrams: number
   calculatedCost: number
   suggestedPrice: number
   filament: Filament | null
+  printer: Printer | null
   createdAt: string
 }
 
 interface PricingBreakdown {
+  printerWatts: number
   electricityCost: number
   laborCost: number
   materialCost: number
@@ -41,6 +61,7 @@ interface PricingBreakdown {
   totalCost: number
   profitMargin: number
   suggestedPrice: number
+  platformPricing: PlatformPricing[]
 }
 
 interface ModelDetail extends Model3D {
@@ -54,6 +75,7 @@ interface ParseResult {
   filamentUsageGrams: number | null
   filamentType: string | null
   slicer: string | null
+  thumbnailUrl: string | null
   storedFileName: string
   parseError?: string
 }
@@ -61,6 +83,7 @@ interface ParseResult {
 export default function Models() {
   const [models, setModels] = useState<Model3D[]>([])
   const [filaments, setFilaments] = useState<Filament[]>([])
+  const [printers, setPrinters] = useState<Printer[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [detail, setDetail] = useState<ModelDetail | null>(null)
@@ -74,20 +97,23 @@ export default function Models() {
     printTimeMinutes: '',
     filamentUsageGrams: '',
     filamentId: '',
+    printerId: '',
   })
 
   useEffect(() => {
     Promise.all([
       api<Model3D[]>('/models'),
       api<Filament[]>('/filaments'),
-    ]).then(([m, f]) => {
+      api<Printer[]>('/printers'),
+    ]).then(([m, f, p]) => {
       setModels(m)
       setFilaments(f)
+      setPrinters(p)
     }).finally(() => setLoading(false))
   }, [])
 
   function resetForm() {
-    setForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '' })
+    setForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '', printerId: '' })
     setParseResult(null)
     setMode('upload')
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -149,7 +175,6 @@ export default function Models() {
       if (mode === 'upload' && parseResult) {
         // Upload mode — use stored file + form overrides
         const formData = new FormData()
-        // Re-upload the file (stored filename reference)
         const fileInput = fileInputRef.current
         if (fileInput?.files?.[0]) {
           formData.append('file', fileInput.files[0])
@@ -158,6 +183,7 @@ export default function Models() {
         formData.append('printTimeMinutes', form.printTimeMinutes)
         formData.append('filamentUsageGrams', form.filamentUsageGrams)
         if (form.filamentId) formData.append('filamentId', form.filamentId)
+        if (form.printerId) formData.append('printerId', form.printerId)
 
         const token = localStorage.getItem('token')
         const res = await fetch('/api/models/upload', {
@@ -177,6 +203,7 @@ export default function Models() {
             printTimeMinutes: parseFloat(form.printTimeMinutes),
             filamentUsageGrams: parseFloat(form.filamentUsageGrams),
             filamentId: form.filamentId || null,
+            printerId: form.printerId || null,
           }),
         })
       }
@@ -217,6 +244,8 @@ export default function Models() {
     return h > 0 ? `${h}h ${m}m` : `${m}m`
   }
 
+  const selectClasses = "flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -253,20 +282,37 @@ export default function Models() {
           <Table>
             <TableHeader>
               <tr>
+                <TableHead className="w-12"></TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Print Time</TableHead>
                 <TableHead>Filament</TableHead>
                 <TableHead>Material</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
               {models.map((model) => (
                 <TableRow key={model.id}>
-                  <TableCell className="font-medium text-foreground">{model.name}</TableCell>
+                  <TableCell className="pr-0">
+                    {model.thumbnailUrl ? (
+                      <img
+                        src={model.thumbnailUrl}
+                        alt={model.name}
+                        className="h-10 w-10 rounded-md object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-raised border border-border-light">
+                        <ImageIcon className="h-5 w-5 text-muted" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium text-foreground">{model.name}</p>
+                      <p className="text-xs text-muted">{formatTime(model.printTimeMinutes)} &middot; {model.filamentUsageGrams}g</p>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {model.slicer ? (
                       <Badge variant="info">{model.slicer}</Badge>
@@ -282,17 +328,15 @@ export default function Models() {
                     {model.filament ? (
                       <Badge variant="info">{model.filament.material}</Badge>
                     ) : (
-                      <span className="text-muted">—</span>
+                      <span className="text-muted">--</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">${model.calculatedCost.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium text-primary">${model.suggestedPrice.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => viewDetail(model.id)} className="rounded p-1 text-muted hover:bg-surface-raised hover:text-foreground">
+                      <button onClick={() => viewDetail(model.id)} className="rounded p-1.5 text-muted hover:bg-surface-raised hover:text-foreground transition-colors" title="View pricing">
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button onClick={() => handleDelete(model.id)} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600">
+                      <button onClick={() => handleDelete(model.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -357,25 +401,38 @@ export default function Models() {
                     <p className="text-sm font-medium text-foreground">Parsing file...</p>
                   </>
                 ) : parseResult ? (
-                  <>
-                    <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
-                    <p className="text-sm font-medium text-foreground">{parseResult.fileName}</p>
-                    {parseResult.slicer && (
-                      <p className="text-xs text-muted mt-1">
-                        Detected: {parseResult.slicer}
-                        {parseResult.printTimeMinutes != null && parseResult.filamentUsageGrams != null && (
-                          <> — {formatTime(parseResult.printTimeMinutes)}, {parseResult.filamentUsageGrams}g</>
-                        )}
-                      </p>
+                  <div className="flex items-center gap-4 w-full">
+                    {/* Thumbnail preview */}
+                    {parseResult.thumbnailUrl ? (
+                      <img
+                        src={parseResult.thumbnailUrl}
+                        alt="Preview"
+                        className="h-20 w-20 rounded-lg object-cover border border-green-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-green-100 border border-green-200 shrink-0">
+                        <CheckCircle className="h-8 w-8 text-green-500" />
+                      </div>
                     )}
-                    {parseResult.parseError && (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {parseResult.parseError}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted mt-2">Click to replace</p>
-                  </>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{parseResult.fileName}</p>
+                      {parseResult.slicer && (
+                        <p className="text-xs text-muted mt-1">
+                          Detected: <span className="text-blue-600 font-medium">{parseResult.slicer}</span>
+                          {parseResult.printTimeMinutes != null && parseResult.filamentUsageGrams != null && (
+                            <> — {formatTime(parseResult.printTimeMinutes)}, {parseResult.filamentUsageGrams}g</>
+                          )}
+                        </p>
+                      )}
+                      {parseResult.parseError && (
+                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {parseResult.parseError}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted mt-1">Click to replace</p>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <Upload className="h-8 w-8 text-muted mb-2" />
@@ -421,13 +478,26 @@ export default function Models() {
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">Filament</label>
             <select
-              className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+              className={selectClasses}
               value={form.filamentId}
               onChange={(e) => setForm({ ...form, filamentId: e.target.value })}
             >
               <option value="">None (use default cost)</option>
               {filaments.map((f) => (
                 <option key={f.id} value={f.id}>{f.brand} {f.material} - {f.variant}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-foreground">Printer</label>
+            <select
+              className={selectClasses}
+              value={form.printerId}
+              onChange={(e) => setForm({ ...form, printerId: e.target.value })}
+            >
+              <option value="">Auto (first printer or 200W default)</option>
+              {printers.map((p) => (
+                <option key={p.id} value={p.id}>{p.brand} {p.model} ({p.powerConsumption}W)</option>
               ))}
             </select>
           </div>
@@ -445,51 +515,111 @@ export default function Models() {
         </form>
       </Modal>
 
-      {/* Detail Modal */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title="Pricing Breakdown" className="max-w-md">
+      {/* Detail / Pricing Modal */}
+      <Modal open={!!detail} onClose={() => setDetail(null)} title="Pricing Breakdown" className="max-w-lg">
         {detail && (
           <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-foreground">{detail.name}</h3>
-              <p className="text-sm text-muted">
-                {formatTime(detail.printTimeMinutes)} &middot; {detail.filamentUsageGrams}g
-                {detail.slicer && <> &middot; <span className="text-blue-600">{detail.slicer}</span></>}
-              </p>
+            {/* Model header with thumbnail */}
+            <div className="flex items-start gap-4">
+              {detail.thumbnailUrl ? (
+                <img
+                  src={detail.thumbnailUrl}
+                  alt={detail.name}
+                  className="h-24 w-24 rounded-lg object-cover border border-border shrink-0"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-surface-raised border border-border-light shrink-0">
+                  <Box className="h-10 w-10 text-muted" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h3 className="font-semibold text-foreground text-lg">{detail.name}</h3>
+                <p className="text-sm text-muted mt-0.5">
+                  {formatTime(detail.printTimeMinutes)} &middot; {detail.filamentUsageGrams}g
+                  {detail.slicer && <> &middot; <span className="text-blue-600">{detail.slicer}</span></>}
+                </p>
+                {detail.printer && (
+                  <p className="text-xs text-muted mt-1">
+                    Printer: {detail.printer.brand} {detail.printer.model} ({detail.pricing.printerWatts}W)
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Cost breakdown */}
             <div className="space-y-2 rounded-lg bg-surface-raised p-4 text-sm">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Production Cost</p>
               <div className="flex justify-between">
                 <span className="text-muted">Material Cost</span>
-                <span>${detail.pricing.materialCost.toFixed(2)}</span>
+                <span className="text-foreground">${detail.pricing.materialCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">Electricity Cost</span>
-                <span>${detail.pricing.electricityCost.toFixed(2)}</span>
+                <span className="text-muted">Electricity Cost <span className="text-xs">({detail.pricing.printerWatts}W)</span></span>
+                <span className="text-foreground">${detail.pricing.electricityCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Labor Cost</span>
-                <span>${detail.pricing.laborCost.toFixed(2)}</span>
+                <span className="text-foreground">${detail.pricing.laborCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted">Base Cost</span>
-                <span className="font-medium">${detail.pricing.baseCost.toFixed(2)}</span>
+                <span className="font-medium text-foreground">${detail.pricing.baseCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Tax</span>
-                <span>${detail.pricing.taxAmount.toFixed(2)}</span>
-              </div>
+              {detail.pricing.taxAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted">Tax</span>
+                  <span className="text-foreground">${detail.pricing.taxAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted">Total Cost</span>
-                <span className="font-medium">${detail.pricing.totalCost.toFixed(2)}</span>
+                <span className="font-medium text-foreground">${detail.pricing.totalCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-2">
-                <span className="text-muted">Profit Margin</span>
-                <span>{detail.pricing.profitMargin}%</span>
-              </div>
-              <div className="flex justify-between text-base font-semibold text-primary">
-                <span>Suggested Price</span>
-                <span>${detail.pricing.suggestedPrice.toFixed(2)}</span>
+
+              {/* Base price (no marketplace) */}
+              <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
+                <span className="text-foreground">Base Price <span className="text-xs font-normal text-muted">(no platform fees)</span></span>
+                <span className="text-primary">${detail.pricing.suggestedPrice.toFixed(2)}</span>
               </div>
             </div>
+
+            {/* Per-marketplace pricing */}
+            {detail.pricing.platformPricing.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5">
+                  <Store className="h-3.5 w-3.5" />
+                  Price per Marketplace
+                </p>
+                <div className="space-y-2">
+                  {detail.pricing.platformPricing.map((pp) => (
+                    <div
+                      key={pp.platformId}
+                      className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:bg-surface-raised transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="info">{pp.platformType}</Badge>
+                          <span className="font-medium text-foreground">{pp.shopName}</span>
+                        </div>
+                        <p className="text-xs text-muted mt-1">
+                          Fees: ${pp.platformFees.toFixed(2)} &middot; Profit: ${pp.profit.toFixed(2)} ({pp.profitMargin}%)
+                        </p>
+                      </div>
+                      <span className="text-lg font-bold text-primary">${pp.sellingPrice.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {detail.pricing.platformPricing.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                <Store className="h-6 w-6 text-muted mx-auto mb-2" />
+                <p className="text-sm text-muted">No marketplaces configured</p>
+                <p className="text-xs text-muted mt-1">Add marketplaces in Settings to see per-platform pricing</p>
+              </div>
+            )}
+
             <Button variant="outline" className="w-full" onClick={() => setDetail(null)}>Close</Button>
           </div>
         )}

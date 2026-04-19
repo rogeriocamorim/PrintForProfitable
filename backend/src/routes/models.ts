@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import prisma from "../services/prisma";
 import { isAuthenticated } from "../middleware/auth";
 import { parseThreeMF } from "../services/threemf-parser";
@@ -41,6 +42,72 @@ async function getFarmId(userId: string): Promise<string | null> {
   return farm?.id ?? null;
 }
 
+// Helper to save thumbnail from .3mf parse result
+function saveThumbnail(thumbnail: Buffer | null, uniquePrefix: string): string | null {
+  if (!thumbnail) return null;
+  const thumbnailsDir = path.join(__dirname, "../../uploads/thumbnails");
+  if (!fs.existsSync(thumbnailsDir)) {
+    fs.mkdirSync(thumbnailsDir, { recursive: true });
+  }
+  const fileName = `${uniquePrefix}.png`;
+  const filePath = path.join(thumbnailsDir, fileName);
+  fs.writeFileSync(filePath, thumbnail);
+  return fileName;
+}
+
+// Helper to compute per-platform pricing
+interface PlatformPricing {
+  platformId: string;
+  platformType: string;
+  shopName: string;
+  feesConfig: Record<string, unknown>;
+  platformFees: number;
+  sellingPrice: number;
+  profit: number;
+  profitMargin: number;
+}
+
+function computePlatformPricing(
+  totalCostBeforeFees: number,
+  targetMargin: number,
+  platforms: Array<{ id: string; type: string; shopName: string; feesConfig: any; enabled: boolean }>
+): PlatformPricing[] {
+  return platforms
+    .filter((p) => p.enabled)
+    .map((p) => {
+      const fees = p.feesConfig || {};
+      const percentage = parseFloat(fees.percentage || "0") / 100;
+      const flat = parseFloat(fees.flat || "0");
+
+      // Selling price = (totalCost + flat) / (1 - percentage - targetMargin/100)
+      // This ensures after fees and margin, we cover costs
+      const marginFraction = targetMargin / 100;
+      const denominator = 1 - percentage - marginFraction;
+      let sellingPrice: number;
+
+      if (denominator > 0) {
+        sellingPrice = (totalCostBeforeFees + flat) / denominator;
+      } else {
+        // If fees + margin >= 100%, use simple markup
+        sellingPrice = totalCostBeforeFees * (1 + marginFraction) + flat + totalCostBeforeFees * percentage;
+      }
+
+      const platformFees = sellingPrice * percentage + flat;
+      const profit = sellingPrice - totalCostBeforeFees - platformFees;
+
+      return {
+        platformId: p.id,
+        platformType: p.type,
+        shopName: p.shopName,
+        feesConfig: fees,
+        platformFees: +platformFees.toFixed(2),
+        sellingPrice: +sellingPrice.toFixed(2),
+        profit: +profit.toFixed(2),
+        profitMargin: sellingPrice > 0 ? +(profit / sellingPrice * 100).toFixed(1) : 0,
+      };
+    });
+}
+
 // GET / - List all models for user's farm
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -52,11 +119,17 @@ router.get("/", async (req: Request, res: Response) => {
 
     const models = await prisma.model3D.findMany({
       where: { farmId },
-      include: { filament: true },
+      include: { filament: true, printer: true },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(models);
+    // Add thumbnail URLs
+    const modelsWithUrls = models.map((m) => ({
+      ...m,
+      thumbnailUrl: m.thumbnailPath ? `/api/uploads/thumbnails/${m.thumbnailPath}` : null,
+    }));
+
+    res.json(modelsWithUrls);
   } catch (err) {
     console.error("List models error:", err);
     res.status(500).json({ error: "Failed to list models" });
@@ -138,10 +211,14 @@ router.post("/upload/parse", upload.single("file"), async (req: Request, res: Re
 
     try {
       const metadata = parseThreeMF(filePath);
+      // Save thumbnail if extracted
+      const thumbnailName = saveThumbnail(metadata.thumbnail, req.file.filename.replace(/\.[^.]+$/, ''));
+      const { thumbnail: _thumb, ...metaWithoutBuffer } = metadata;
       res.json({
         fileName: req.file.originalname,
         name: path.parse(req.file.originalname).name,
-        ...metadata,
+        ...metaWithoutBuffer,
+        thumbnailUrl: thumbnailName ? `/api/uploads/thumbnails/${thumbnailName}` : null,
         storedFileName: req.file.filename,
       });
     } catch (parseErr) {
@@ -179,14 +256,15 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
       return;
     }
 
-    let { printTimeMinutes, filamentUsageGrams, filamentId } = req.body;
+    let { printTimeMinutes, filamentUsageGrams, filamentId, printerId } = req.body;
     let parsedPrintTime = parseFloat(printTimeMinutes) || 0;
     let parsedFilamentGrams = parseFloat(filamentUsageGrams) || 0;
     let slicer: string | null = null;
+    let thumbnailPath: string | null = null;
 
     // Auto-extract from .3mf if values not provided
     const ext = path.extname(req.file.originalname).toLowerCase();
-    if (ext === ".3mf" && (parsedPrintTime === 0 || parsedFilamentGrams === 0)) {
+    if (ext === ".3mf") {
       try {
         const metadata = parseThreeMF(req.file.path);
         if (parsedPrintTime === 0 && metadata.printTimeMinutes) {
@@ -196,6 +274,9 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
           parsedFilamentGrams = metadata.filamentUsageGrams;
         }
         slicer = metadata.slicer;
+        // Save thumbnail
+        const thumbName = saveThumbnail(metadata.thumbnail, req.file.filename.replace(/\.[^.]+$/, ''));
+        if (thumbName) thumbnailPath = thumbName;
       } catch (parseErr) {
         console.error("3MF auto-parse error:", parseErr);
       }
@@ -208,16 +289,21 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
         fileName: req.file.filename,
         originalFileName: req.file.originalname,
         slicer,
+        thumbnailPath,
         printTimeMinutes: parsedPrintTime,
         filamentUsageGrams: parsedFilamentGrams,
         filamentId: filamentId || null,
+        printerId: printerId || null,
         calculatedCost: 0,
         suggestedPrice: 0,
       },
-      include: { filament: true },
+      include: { filament: true, printer: true },
     });
 
-    res.status(201).json(model);
+    res.status(201).json({
+      ...model,
+      thumbnailUrl: model.thumbnailPath ? `/api/uploads/thumbnails/${model.thumbnailPath}` : null,
+    });
   } catch (err) {
     console.error("Upload model error:", err);
     res.status(500).json({ error: "Failed to upload model" });
@@ -235,7 +321,17 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const model = await prisma.model3D.findFirst({
       where: { id: req.params.id, farmId },
-      include: { filament: true, farm: { include: { taxRates: true } } },
+      include: {
+        filament: true,
+        printer: true,
+        farm: {
+          include: {
+            taxRates: true,
+            salesPlatforms: true,
+            printers: true,
+          },
+        },
+      },
     });
 
     if (!model) {
@@ -245,10 +341,14 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     // Compute pricing breakdown
     const farm = model.farm;
-    const electricityCostPerHour = (farm.electricityRate * 200) / 1000; // assuming 200W printer
-    const printTimeHours = model.printTimeMinutes / 60;
 
-    const electricityCost = electricityCostPerHour * printTimeHours;
+    // Use assigned printer wattage, or first farm printer, or fallback 200W
+    const printerWatts = model.printer?.powerConsumption
+      ?? farm.printers[0]?.powerConsumption
+      ?? 200;
+
+    const printTimeHours = model.printTimeMinutes / 60;
+    const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
     const laborCost = (farm.laborRate / 60) * model.printTimeMinutes * 0.1; // 10% active time
     const filamentCostPerGram = model.filament
       ? model.filament.costPerSpool / model.filament.spoolWeight
@@ -257,15 +357,26 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const baseCost = electricityCost + laborCost + materialCost;
 
-    const totalTaxRate = farm.taxRates.reduce((sum, t) => sum + t.rate, 0) / 100;
+    const totalTaxRate = farm.taxRates.reduce((sum: number, t: any) => sum + t.rate, 0) / 100;
     const taxAmount = baseCost * totalTaxRate;
 
     const totalCost = baseCost + taxAmount;
+
+    // Base suggested price (no platform fees)
     const suggestedPrice = totalCost * (1 + farm.targetProfitMargin / 100);
+
+    // Per-platform pricing
+    const platformPricing = computePlatformPricing(
+      totalCost,
+      farm.targetProfitMargin,
+      farm.salesPlatforms
+    );
 
     res.json({
       ...model,
+      thumbnailUrl: model.thumbnailPath ? `/api/uploads/thumbnails/${model.thumbnailPath}` : null,
       pricing: {
+        printerWatts,
         electricityCost: +electricityCost.toFixed(2),
         laborCost: +laborCost.toFixed(2),
         materialCost: +materialCost.toFixed(2),
@@ -274,6 +385,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         totalCost: +totalCost.toFixed(2),
         profitMargin: farm.targetProfitMargin,
         suggestedPrice: +suggestedPrice.toFixed(2),
+        platformPricing,
       },
     });
   } catch (err) {

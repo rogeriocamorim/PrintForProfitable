@@ -21,10 +21,14 @@ import fs from "fs";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists (with thumbnails subdirectory)
 const uploadsDir = path.join(__dirname, "../uploads");
+const thumbnailsDir = path.join(uploadsDir, "thumbnails");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(thumbnailsDir)) {
+  fs.mkdirSync(thumbnailsDir, { recursive: true });
 }
 
 // Middleware
@@ -54,6 +58,9 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Serve uploaded thumbnails statically
+app.use("/api/uploads/thumbnails", express.static(thumbnailsDir));
 
 // Routes
 app.use("/api/auth", authRoutes);

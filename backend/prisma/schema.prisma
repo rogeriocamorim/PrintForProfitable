@@ -78,7 +78,8 @@ model Printer {
   preselected      Boolean  @default(false)
   createdAt        DateTime @default(now())
 
-  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm   Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  models Model3D[]
 
   @@map("printers")
 }
@@ -150,15 +151,18 @@ model Model3D {
   fileName           String
   originalFileName   String?
   slicer             String?
+  thumbnailPath      String?
   printTimeMinutes   Float
   filamentUsageGrams Float
   filamentId         String?
+  printerId          String?
   calculatedCost     Float
   suggestedPrice     Float
   createdAt          DateTime @default(now())
 
   farm     Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
   filament Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
+  printer  Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
 
   @@map("models_3d")
 }
