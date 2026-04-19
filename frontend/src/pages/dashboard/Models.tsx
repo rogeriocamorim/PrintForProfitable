@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../lib/api'
-import { Card, CardHeader, CardContent } from '../../components/ui/Card'
+import { Card, CardContent } from '../../components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { Plus, Trash2, Eye, Loader2, Box, X } from 'lucide-react'
+import { Plus, Trash2, Eye, Loader2, Box } from 'lucide-react'
 
 interface Filament {
   id: string

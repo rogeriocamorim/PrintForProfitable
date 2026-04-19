@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { Card, CardContent } from '../../components/ui/Card'
-import { Loader2, Box, Cpu, Palette, Store, Truck, DollarSign, TrendingUp, Zap } from 'lucide-react'
+import { Loader2, Box, Cpu, Palette, Store, DollarSign, TrendingUp, Zap } from 'lucide-react'
 
 interface Farm {
   id: string
