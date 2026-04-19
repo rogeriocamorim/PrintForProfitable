@@ -55,10 +55,13 @@ interface PricingBreakdown {
   printerWatts: number
   electricityCost: number
   laborCost: number
+  prepTimeMinutes: number
   materialCost: number
   baseCost: number
   taxAmount: number
   totalCost: number
+  shippingCost: number
+  shippingRevenue: number
   profitMargin: number
   suggestedPrice: number
   platformPricing: PlatformPricing[]
@@ -584,7 +587,7 @@ export default function Models() {
                 <span className="text-foreground">${detail.pricing.electricityCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">Labor Cost</span>
+                <span className="text-muted">Labor <span className="text-xs">({detail.pricing.prepTimeMinutes} min prep)</span></span>
                 <span className="text-foreground">${detail.pricing.laborCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t border-border pt-2">
@@ -598,9 +601,21 @@ export default function Models() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted">Total Cost</span>
+                <span className="text-muted">Total Cost (COGS)</span>
                 <span className="font-medium text-foreground">${detail.pricing.totalCost.toFixed(2)}</span>
               </div>
+              {(detail.pricing.shippingCost > 0 || detail.pricing.shippingRevenue > 0) && (
+                <>
+                  <div className="flex justify-between border-t border-border pt-2">
+                    <span className="text-muted">Shipping Cost</span>
+                    <span className="text-foreground">${detail.pricing.shippingCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Shipping Charged</span>
+                    <span className="text-foreground">${detail.pricing.shippingRevenue.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
 
               {/* Base price (no marketplace) */}
               <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">

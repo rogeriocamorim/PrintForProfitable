@@ -41,6 +41,7 @@ model Farm {
   userId               String
   electricityRate      Float    @default(0.12)
   laborRate            Float    @default(60)
+  prepTimeMinutes      Float    @default(10)
   targetProfitMargin   Float    @default(50)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

@@ -16,6 +16,7 @@ interface Farm {
   name: string
   electricityRate: number
   laborRate: number
+  prepTimeMinutes: number
   targetProfitMargin: number
   taxRates: TaxRate[]
 }
@@ -29,6 +30,7 @@ export default function FarmSettings() {
     name: '',
     electricityRate: '',
     laborRate: '',
+    prepTimeMinutes: '',
     targetProfitMargin: '',
   })
   const [newTax, setNewTax] = useState({ name: '', rate: '' })
@@ -45,6 +47,7 @@ export default function FarmSettings() {
         name: data.name,
         electricityRate: String(parseFloat(data.electricityRate.toFixed(4))),
         laborRate: String(parseFloat(data.laborRate.toFixed(2))),
+        prepTimeMinutes: String(parseFloat((data.prepTimeMinutes || 10).toFixed(0))),
         targetProfitMargin: String(parseFloat(data.targetProfitMargin.toFixed(2))),
       })
     } catch {
@@ -65,6 +68,7 @@ export default function FarmSettings() {
           name: form.name,
           electricityRate: parseFloat(form.electricityRate),
           laborRate: parseFloat(form.laborRate),
+          prepTimeMinutes: parseFloat(form.prepTimeMinutes),
           targetProfitMargin: parseFloat(form.targetProfitMargin),
         }),
       })
@@ -156,6 +160,14 @@ export default function FarmSettings() {
                 suffix="/hr"
                 value={form.laborRate}
                 onChange={(e) => setForm({ ...form, laborRate: e.target.value })}
+              />
+              <Input
+                label="Prep Time per Print"
+                type="number"
+                step="1"
+                suffix="min"
+                value={form.prepTimeMinutes}
+                onChange={(e) => setForm({ ...form, prepTimeMinutes: e.target.value })}
               />
               <Input
                 label="Target Profit Margin"

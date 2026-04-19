@@ -69,6 +69,8 @@ interface PlatformPricing {
 
 function computePlatformPricing(
   totalCostBeforeFees: number,
+  shippingCost: number,
+  shippingRevenue: number,
   targetMargin: number,
   platforms: Array<{ id: string; type: string; shopName: string; feesConfig: any; enabled: boolean }>
 ): PlatformPricing[] {
@@ -79,21 +81,26 @@ function computePlatformPricing(
       const percentage = parseFloat(fees.percentage || "0") / 100;
       const flat = parseFloat(fees.flat || "0");
 
-      // Selling price = (totalCost + flat) / (1 - percentage - targetMargin/100)
-      // This ensures after fees and margin, we cover costs
+      // Total cost includes shipping cost; shipping revenue offsets the selling price needed
+      // sellingPrice = (totalCost + shippingCost - shippingRevenue + flat) / (1 - percentage - margin/100)
       const marginFraction = targetMargin / 100;
       const denominator = 1 - percentage - marginFraction;
+      const netShippingCost = shippingCost - shippingRevenue; // negative if customer overpays shipping
       let sellingPrice: number;
 
       if (denominator > 0) {
-        sellingPrice = (totalCostBeforeFees + flat) / denominator;
+        sellingPrice = (totalCostBeforeFees + netShippingCost + flat) / denominator;
       } else {
-        // If fees + margin >= 100%, use simple markup
-        sellingPrice = totalCostBeforeFees * (1 + marginFraction) + flat + totalCostBeforeFees * percentage;
+        sellingPrice = (totalCostBeforeFees + netShippingCost) * (1 + marginFraction) + flat + totalCostBeforeFees * percentage;
+      }
+
+      // Ensure selling price is at least the cost
+      if (sellingPrice < totalCostBeforeFees + netShippingCost) {
+        sellingPrice = totalCostBeforeFees + netShippingCost;
       }
 
       const platformFees = sellingPrice * percentage + flat;
-      const profit = sellingPrice - totalCostBeforeFees - platformFees;
+      const profit = sellingPrice - totalCostBeforeFees - netShippingCost - platformFees;
 
       return {
         platformId: p.id,
@@ -329,6 +336,7 @@ router.get("/:id", async (req: Request, res: Response) => {
             taxRates: true,
             salesPlatforms: true,
             printers: true,
+            shippingProfiles: true,
           },
         },
       },
@@ -349,7 +357,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const printTimeHours = model.printTimeMinutes / 60;
     const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
-    const laborCost = (farm.laborRate / 60) * model.printTimeMinutes * 0.1; // 10% active time
+    const laborCost = (farm.laborRate / 60) * (farm.prepTimeMinutes || 10); // fixed prep time, not print-time-based
     const filamentCostPerGram = model.filament
       ? model.filament.costPerSpool / model.filament.spoolWeight
       : 0.02; // fallback
@@ -362,12 +370,19 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const totalCost = baseCost + taxAmount;
 
-    // Base suggested price (no platform fees)
+    // Shipping: use first shipping profile if available
+    const shipping = farm.shippingProfiles[0] || null;
+    const shippingCost = shipping ? shipping.postageCost : 0;
+    const shippingRevenue = shipping ? shipping.customerPays : 0;
+
+    // Base suggested price (no platform fees, no shipping)
     const suggestedPrice = totalCost * (1 + farm.targetProfitMargin / 100);
 
-    // Per-platform pricing
+    // Per-platform pricing (includes shipping in cost basis)
     const platformPricing = computePlatformPricing(
       totalCost,
+      shippingCost,
+      shippingRevenue,
       farm.targetProfitMargin,
       farm.salesPlatforms
     );
@@ -379,10 +394,13 @@ router.get("/:id", async (req: Request, res: Response) => {
         printerWatts,
         electricityCost: +electricityCost.toFixed(2),
         laborCost: +laborCost.toFixed(2),
+        prepTimeMinutes: farm.prepTimeMinutes || 10,
         materialCost: +materialCost.toFixed(2),
         baseCost: +baseCost.toFixed(2),
         taxAmount: +taxAmount.toFixed(2),
         totalCost: +totalCost.toFixed(2),
+        shippingCost: +shippingCost.toFixed(2),
+        shippingRevenue: +shippingRevenue.toFixed(2),
         profitMargin: farm.targetProfitMargin,
         suggestedPrice: +suggestedPrice.toFixed(2),
         platformPricing,

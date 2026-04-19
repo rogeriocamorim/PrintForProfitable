@@ -84,11 +84,15 @@ docker exec printforprofitable_postgres_1 psql -U pfp -d printforprofitable \
 ```
 Material  = (filament_grams / spool_weight) * cost_per_spool
 Electric  = (print_hours * printer_watts / 1000) * electricity_rate
-Labor     = labor_hours * labor_rate
-Total     = Material + Electric + Labor
-Base      = Total / (1 - margin/100)           # price without platform fees
-Selling   = (Total + flatFee) / (1 - pctFee - margin/100)  # per-marketplace
+Labor     = (labor_rate / 60) * prep_time_minutes   # fixed prep time, NOT print-time-based
+COGS      = Material + Electric + Labor + Tax
+Shipping  = shipping_cost - shipping_revenue         # net shipping cost (from first shipping profile)
+Base      = COGS / (1 - margin/100)                  # price without platform fees
+Selling   = (COGS + netShipping + flatFee) / (1 - pctFee - margin/100)  # per-marketplace
 ```
+
+- `prepTimeMinutes` is a Farm-level setting (default 10 min). Covers setup + removal time only — printer runs unattended.
+- Shipping uses the farm's first `ShippingProfile`. `customerPays` is revenue, `postageCost` is expense.
 
 ## Per-marketplace pricing
 
