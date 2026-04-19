@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import prisma from "../services/prisma";
 import { isAuthenticated } from "../middleware/auth";
+import { parseThreeMF } from "../services/threemf-parser";
 
 const router = Router();
 router.use(isAuthenticated);
@@ -109,7 +110,62 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// POST /upload - Handle .3mf file upload
+// POST /upload/parse - Parse .3mf file and return extracted metadata (no save)
+router.post("/upload/parse", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const filePath = req.file.path;
+    const ext = path.extname(req.file.originalname).toLowerCase();
+
+    if (ext !== ".3mf") {
+      // Non-.3mf files can't be parsed for metadata
+      res.json({
+        fileName: req.file.originalname,
+        name: path.parse(req.file.originalname).name,
+        printTimeMinutes: null,
+        filamentUsageGrams: null,
+        filamentType: null,
+        slicer: null,
+        plates: [],
+        storedFileName: req.file.filename,
+      });
+      return;
+    }
+
+    try {
+      const metadata = parseThreeMF(filePath);
+      res.json({
+        fileName: req.file.originalname,
+        name: path.parse(req.file.originalname).name,
+        ...metadata,
+        storedFileName: req.file.filename,
+      });
+    } catch (parseErr) {
+      console.error("3MF parse error:", parseErr);
+      // Return partial result — file was saved, just no metadata extracted
+      res.json({
+        fileName: req.file.originalname,
+        name: path.parse(req.file.originalname).name,
+        printTimeMinutes: null,
+        filamentUsageGrams: null,
+        filamentType: null,
+        slicer: null,
+        plates: [],
+        storedFileName: req.file.filename,
+        parseError: "Could not extract metadata from this .3mf file",
+      });
+    }
+  } catch (err) {
+    console.error("Parse upload error:", err);
+    res.status(500).json({ error: "Failed to parse file" });
+  }
+});
+
+// POST /upload - Handle file upload and create model (with auto-parsing)
 router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
     const farmId = await getFarmId(req.user!.id);
@@ -123,16 +179,37 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
       return;
     }
 
-    const { printTimeMinutes, filamentUsageGrams, filamentId } = req.body;
+    let { printTimeMinutes, filamentUsageGrams, filamentId } = req.body;
+    let parsedPrintTime = parseFloat(printTimeMinutes) || 0;
+    let parsedFilamentGrams = parseFloat(filamentUsageGrams) || 0;
+    let slicer: string | null = null;
 
-    // Parse print time and filament from the uploaded file metadata (or from body)
+    // Auto-extract from .3mf if values not provided
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (ext === ".3mf" && (parsedPrintTime === 0 || parsedFilamentGrams === 0)) {
+      try {
+        const metadata = parseThreeMF(req.file.path);
+        if (parsedPrintTime === 0 && metadata.printTimeMinutes) {
+          parsedPrintTime = metadata.printTimeMinutes;
+        }
+        if (parsedFilamentGrams === 0 && metadata.filamentUsageGrams) {
+          parsedFilamentGrams = metadata.filamentUsageGrams;
+        }
+        slicer = metadata.slicer;
+      } catch (parseErr) {
+        console.error("3MF auto-parse error:", parseErr);
+      }
+    }
+
     const model = await prisma.model3D.create({
       data: {
         farmId,
         name: req.body.name || path.parse(req.file.originalname).name,
         fileName: req.file.filename,
-        printTimeMinutes: parseFloat(printTimeMinutes) || 0,
-        filamentUsageGrams: parseFloat(filamentUsageGrams) || 0,
+        originalFileName: req.file.originalname,
+        slicer,
+        printTimeMinutes: parsedPrintTime,
+        filamentUsageGrams: parsedFilamentGrams,
         filamentId: filamentId || null,
         calculatedCost: 0,
         suggestedPrice: 0,

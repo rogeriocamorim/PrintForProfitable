@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../../lib/api'
 import { Card, CardContent } from '../../components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table'
@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { Plus, Trash2, Eye, Loader2, Box } from 'lucide-react'
+import { Plus, Trash2, Eye, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface Filament {
   id: string
@@ -22,6 +22,8 @@ interface Model3D {
   id: string
   name: string
   fileName: string
+  originalFileName: string | null
+  slicer: string | null
   printTimeMinutes: number
   filamentUsageGrams: number
   calculatedCost: number
@@ -45,6 +47,17 @@ interface ModelDetail extends Model3D {
   pricing: PricingBreakdown
 }
 
+interface ParseResult {
+  fileName: string
+  name: string
+  printTimeMinutes: number | null
+  filamentUsageGrams: number | null
+  filamentType: string | null
+  slicer: string | null
+  storedFileName: string
+  parseError?: string
+}
+
 export default function Models() {
   const [models, setModels] = useState<Model3D[]>([])
   const [filaments, setFilaments] = useState<Filament[]>([])
@@ -52,6 +65,10 @@ export default function Models() {
   const [showAdd, setShowAdd] = useState(false)
   const [detail, setDetail] = useState<ModelDetail | null>(null)
   const [saving, setSaving] = useState(false)
+  const [mode, setMode] = useState<'manual' | 'upload'>('upload')
+  const [uploading, setUploading] = useState(false)
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     name: '',
     printTimeMinutes: '',
@@ -69,22 +86,104 @@ export default function Models() {
     }).finally(() => setLoading(false))
   }, [])
 
+  function resetForm() {
+    setForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '' })
+    setParseResult(null)
+    setMode('upload')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setParseResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/models/upload/parse', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+
+      if (!res.ok) throw new Error('Upload failed')
+
+      const result: ParseResult = await res.json()
+      setParseResult(result)
+
+      // Auto-fill form with extracted data
+      setForm((prev) => ({
+        ...prev,
+        name: result.name || prev.name,
+        printTimeMinutes: result.printTimeMinutes != null ? String(Math.round(result.printTimeMinutes)) : prev.printTimeMinutes,
+        filamentUsageGrams: result.filamentUsageGrams != null ? String(Math.round(result.filamentUsageGrams * 100) / 100) : prev.filamentUsageGrams,
+      }))
+
+      // Try to auto-match filament by type
+      if (result.filamentType && filaments.length > 0) {
+        const match = filaments.find((f) =>
+          f.material.toLowerCase() === result.filamentType!.toLowerCase()
+        )
+        if (match) {
+          setForm((prev) => ({ ...prev, filamentId: match.id }))
+        }
+      }
+    } catch {
+      // error
+    } finally {
+      setUploading(false)
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      const model = await api<Model3D>('/models', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: form.name,
-          printTimeMinutes: parseFloat(form.printTimeMinutes),
-          filamentUsageGrams: parseFloat(form.filamentUsageGrams),
-          filamentId: form.filamentId || null,
-        }),
-      })
+      let model: Model3D
+
+      if (mode === 'upload' && parseResult) {
+        // Upload mode — use stored file + form overrides
+        const formData = new FormData()
+        // Re-upload the file (stored filename reference)
+        const fileInput = fileInputRef.current
+        if (fileInput?.files?.[0]) {
+          formData.append('file', fileInput.files[0])
+        }
+        formData.append('name', form.name)
+        formData.append('printTimeMinutes', form.printTimeMinutes)
+        formData.append('filamentUsageGrams', form.filamentUsageGrams)
+        if (form.filamentId) formData.append('filamentId', form.filamentId)
+
+        const token = localStorage.getItem('token')
+        const res = await fetch('/api/models/upload', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        })
+
+        if (!res.ok) throw new Error('Upload failed')
+        model = await res.json()
+      } else {
+        // Manual mode
+        model = await api<Model3D>('/models', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: form.name,
+            printTimeMinutes: parseFloat(form.printTimeMinutes),
+            filamentUsageGrams: parseFloat(form.filamentUsageGrams),
+            filamentId: form.filamentId || null,
+          }),
+        })
+      }
+
       setModels([model, ...models])
       setShowAdd(false)
-      setForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '' })
+      resetForm()
     } catch {
       // error
     } finally {
@@ -133,7 +232,7 @@ export default function Models() {
           <h1 className="text-2xl font-bold text-gray-900">3D Models</h1>
           <p className="text-sm text-muted mt-1">{models.length} model{models.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => setShowAdd(true)}>
+        <Button onClick={() => { resetForm(); setShowAdd(true) }}>
           <Plus className="h-4 w-4" /> Add Model
         </Button>
       </div>
@@ -144,8 +243,8 @@ export default function Models() {
             <EmptyState
               icon={<Box className="h-12 w-12" />}
               title="No models yet"
-              description="Add your first 3D model to see pricing calculations"
-              action={<Button onClick={() => setShowAdd(true)}><Plus className="h-4 w-4" /> Add Model</Button>}
+              description="Upload a .3mf file or manually enter model details to see pricing calculations"
+              action={<Button onClick={() => { resetForm(); setShowAdd(true) }}><Plus className="h-4 w-4" /> Add Model</Button>}
             />
           </CardContent>
         </Card>
@@ -155,6 +254,7 @@ export default function Models() {
             <TableHeader>
               <tr>
                 <TableHead>Name</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Print Time</TableHead>
                 <TableHead>Filament</TableHead>
                 <TableHead>Material</TableHead>
@@ -167,6 +267,15 @@ export default function Models() {
               {models.map((model) => (
                 <TableRow key={model.id}>
                   <TableCell className="font-medium text-gray-900">{model.name}</TableCell>
+                  <TableCell>
+                    {model.slicer ? (
+                      <Badge variant="info">{model.slicer}</Badge>
+                    ) : model.originalFileName ? (
+                      <Badge variant="default">Upload</Badge>
+                    ) : (
+                      <span className="text-muted text-xs">Manual</span>
+                    )}
+                  </TableCell>
                   <TableCell>{formatTime(model.printTimeMinutes)}</TableCell>
                   <TableCell>{model.filamentUsageGrams}g</TableCell>
                   <TableCell>
@@ -196,8 +305,95 @@ export default function Models() {
       )}
 
       {/* Add Model Modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Model">
+      <Modal open={showAdd} onClose={() => { setShowAdd(false); resetForm() }} title="Add Model">
+        {/* Mode Toggle */}
+        <div className="flex rounded-lg border border-gray-200 p-1 mb-4">
+          <button
+            type="button"
+            className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              mode === 'upload'
+                ? 'bg-primary text-white'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            onClick={() => setMode('upload')}
+          >
+            <Upload className="h-4 w-4" /> Upload File
+          </button>
+          <button
+            type="button"
+            className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              mode === 'manual'
+                ? 'bg-primary text-white'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            onClick={() => setMode('manual')}
+          >
+            <FileUp className="h-4 w-4" /> Manual Entry
+          </button>
+        </div>
+
         <form onSubmit={handleCreate} className="space-y-4">
+          {/* File Upload Area */}
+          {mode === 'upload' && (
+            <div className="space-y-3">
+              <div
+                className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+                  parseResult
+                    ? 'border-green-300 bg-green-50'
+                    : 'border-gray-300 hover:border-primary hover:bg-orange-50/30'
+                } ${uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".3mf,.stl,.gcode"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                    <p className="text-sm font-medium text-gray-700">Parsing file...</p>
+                  </>
+                ) : parseResult ? (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-500 mb-2" />
+                    <p className="text-sm font-medium text-gray-900">{parseResult.fileName}</p>
+                    {parseResult.slicer && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Detected: {parseResult.slicer}
+                        {parseResult.printTimeMinutes != null && parseResult.filamentUsageGrams != null && (
+                          <> — {formatTime(parseResult.printTimeMinutes)}, {parseResult.filamentUsageGrams}g</>
+                        )}
+                      </p>
+                    )}
+                    {parseResult.parseError && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {parseResult.parseError}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-2">Click to replace</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                    <p className="text-sm font-medium text-gray-700">Drop a .3mf file or click to browse</p>
+                    <p className="text-xs text-gray-400 mt-1">Print time & filament usage will be extracted automatically</p>
+                  </>
+                )}
+              </div>
+
+              {parseResult && parseResult.printTimeMinutes != null && parseResult.filamentUsageGrams != null && (
+                <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span>Print time and filament usage auto-filled from {parseResult.slicer || 'file'} metadata. You can adjust below.</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <Input
             label="Model Name"
             value={form.name}
@@ -236,10 +432,14 @@ export default function Models() {
             </select>
           </div>
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button type="submit" className="flex-1" disabled={saving}>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowAdd(false); resetForm() }}>Cancel</Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={saving || (mode === 'upload' && !parseResult)}
+            >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Add Model
+              {mode === 'upload' ? 'Upload & Add' : 'Add Model'}
             </Button>
           </div>
         </form>
@@ -251,7 +451,10 @@ export default function Models() {
           <div className="space-y-4">
             <div>
               <h3 className="font-semibold text-gray-900">{detail.name}</h3>
-              <p className="text-sm text-muted">{formatTime(detail.printTimeMinutes)} &middot; {detail.filamentUsageGrams}g</p>
+              <p className="text-sm text-muted">
+                {formatTime(detail.printTimeMinutes)} &middot; {detail.filamentUsageGrams}g
+                {detail.slicer && <> &middot; <span className="text-blue-600">{detail.slicer}</span></>}
+              </p>
             </div>
             <div className="space-y-2 rounded-lg bg-gray-50 p-4 text-sm">
               <div className="flex justify-between">

@@ -148,6 +148,8 @@ model Model3D {
   farmId             String
   name               String
   fileName           String
+  originalFileName   String?
+  slicer             String?
   printTimeMinutes   Float
   filamentUsageGrams Float
   filamentId         String?
