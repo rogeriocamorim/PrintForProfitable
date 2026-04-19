@@ -33,7 +33,9 @@ backend/
   src/routes/admin.ts           # stop-impersonation ABOVE requireSuperAdmin middleware
   src/routes/wizard.ts          # 4-step setup
   src/routes/farms.ts           # Farm CRUD + tax-rates POST/DELETE
-  src/routes/models.ts          # Model CRUD + file upload + pricing breakdown
+  src/routes/models.ts          # Model CRUD + file upload + pricing breakdown + per-marketplace pricing
+  src/services/threemf-parser.ts # .3mf parser (PrusaSlicer, BambuStudio, OrcaSlicer, Cura) + thumbnail extraction
+  uploads/thumbnails/           # Extracted .3mf thumbnails (served at /api/uploads/thumbnails)
   src/routes/printers.ts        # Printer CRUD
   src/routes/filaments.ts       # Filament CRUD
   src/routes/platforms.ts       # Sales platform CRUD
@@ -84,8 +86,13 @@ Material  = (filament_grams / spool_weight) * cost_per_spool
 Electric  = (print_hours * printer_watts / 1000) * electricity_rate
 Labor     = labor_hours * labor_rate
 Total     = Material + Electric + Labor
-Price     = Total / (1 - margin/100) + platform_fees + tax
+Base      = Total / (1 - margin/100)           # price without platform fees
+Selling   = (Total + flatFee) / (1 - pctFee - margin/100)  # per-marketplace
 ```
+
+## Per-marketplace pricing
+
+GET `/models/:id` returns `platformPricing[]` with per-platform selling price, fees, profit, margin. Uses model's assigned printer wattage (or first farm printer, or 200W fallback). Thumbnail served at `/api/uploads/thumbnails/<filename>`.
 
 ## What's done
 
@@ -96,6 +103,8 @@ Price     = Total / (1 - margin/100) + platform_fees + tax
 - Docker Compose (postgres + backend + frontend/nginx), ARM64 compatible
 - Backend CRUD routes: printers, filaments, platforms, shipping, farms/tax-rates
 - .3mf file parser: PrusaSlicer, BambuStudio, OrcaSlicer, Cura (adm-zip + fast-xml-parser)
+- Thumbnail extraction from .3mf files, served at /api/uploads/thumbnails
+- Per-marketplace pricing breakdown (selling price, fees, profit per platform)
 - Printer presets: all Bambu Lab models + Prusa + Creality + Voron + Elegoo with avg wattage
 - 7 functional dashboard pages: Dashboard, Models, Printers, Filaments, Marketplaces, Shipping, FarmSettings
 - 6 placeholder pages: Analytics, Orders, PrintQueue, Users, Supplies, Integrations
