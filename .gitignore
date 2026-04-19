@@ -3,3 +3,10 @@ dist/
 .env
 uploads/
 *.log
+
+# Test artifacts
+test-results/
+playwright-report/
+playwright-transform-cache-*/
+node-compile-cache/
+blob-report/
