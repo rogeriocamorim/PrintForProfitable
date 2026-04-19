@@ -34,51 +34,75 @@ const COUNTRIES: { value: Country; label: string; currency: string }[] = [
   { value: 'AU', label: 'Australia', currency: 'A$' },
 ]
 
-// Default fees per platform per country: { percentage: %, flat: currency amount }
-// Sources: Official 2024-2025 fee schedules
-const PLATFORM_DEFAULTS: Record<string, Record<Country, { percentage: string; flat: string; notes: string }>> = {
+// Each fee component stored separately
+interface FeeDefaults {
+  transactionPct: string   // e.g. "6.5"
+  processingPct: string    // e.g. "3"
+  processingFlat: string   // e.g. "0.25"
+  listingFee: string       // e.g. "0.20"
+}
+
+// Which fee fields are relevant per platform type
+const PLATFORM_FEE_LABELS: Record<string, { transactionPct?: string; processingPct?: string; processingFlat?: string; listingFee?: string }> = {
+  ETSY:    { transactionPct: 'Transaction Fee', processingPct: 'Payment Processing', processingFlat: 'Processing Flat Fee', listingFee: 'Listing Fee' },
+  AMAZON:  { transactionPct: 'Referral Fee' },
+  SHOPIFY: { processingPct: 'Payment Processing', processingFlat: 'Processing Flat Fee' },
+  TIKTOK:  { transactionPct: 'Referral Fee', processingPct: 'Payment Processing', processingFlat: 'Processing Flat Fee' },
+  EBAY:    { transactionPct: 'Final Value Fee', processingFlat: 'Per-Order Fee' },
+  CUSTOM:  { transactionPct: 'Fee Percentage', processingFlat: 'Flat Fee per Sale' },
+}
+
+const PLATFORM_DEFAULTS: Record<string, Record<Country, FeeDefaults>> = {
   ETSY: {
-    US: { percentage: '9.5', flat: '0.45', notes: '6.5% transaction + 3% processing + $0.25 + $0.20 listing' },
-    UK: { percentage: '9.5', flat: '0.36', notes: '6.5% transaction + 3% processing + £0.20 + £0.16 listing' },
-    EU: { percentage: '9.5', flat: '0.43', notes: '6.5% transaction + 3% processing + €0.25 + €0.18 listing' },
-    BR: { percentage: '9.5', flat: '2.25', notes: '6.5% transaction + 3% processing + R$1.25 + R$1.00 listing' },
-    AU: { percentage: '9.5', flat: '0.55', notes: '6.5% transaction + 3% processing + A$0.25 + A$0.30 listing' },
+    US: { transactionPct: '6.5', processingPct: '3', processingFlat: '0.25', listingFee: '0.20' },
+    UK: { transactionPct: '6.5', processingPct: '3', processingFlat: '0.20', listingFee: '0.16' },
+    EU: { transactionPct: '6.5', processingPct: '3', processingFlat: '0.25', listingFee: '0.18' },
+    BR: { transactionPct: '6.5', processingPct: '3', processingFlat: '1.25', listingFee: '1.00' },
+    AU: { transactionPct: '6.5', processingPct: '3', processingFlat: '0.25', listingFee: '0.30' },
   },
   AMAZON: {
-    US: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
-    UK: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
-    EU: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
-    BR: { percentage: '16', flat: '0.00', notes: '16% referral fee (category avg)' },
-    AU: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
+    US: { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    UK: { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    EU: { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    BR: { transactionPct: '16', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
   },
   SHOPIFY: {
-    US: { percentage: '2.9', flat: '0.30', notes: '2.9% + $0.30 payment processing' },
-    UK: { percentage: '2.2', flat: '0.20', notes: '2.2% + £0.20 payment processing' },
-    EU: { percentage: '2.2', flat: '0.25', notes: '2.2% + €0.25 payment processing' },
-    BR: { percentage: '3.5', flat: '0.00', notes: '3.5% payment processing' },
-    AU: { percentage: '2.9', flat: '0.30', notes: '2.9% + A$0.30 payment processing' },
+    US: { transactionPct: '0', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
+    UK: { transactionPct: '0', processingPct: '2.2', processingFlat: '0.20', listingFee: '0' },
+    EU: { transactionPct: '0', processingPct: '2.2', processingFlat: '0.25', listingFee: '0' },
+    BR: { transactionPct: '0', processingPct: '3.5', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '0', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
   },
   TIKTOK: {
-    US: { percentage: '10.9', flat: '0.30', notes: '8% referral + 2.9% processing + $0.30' },
-    UK: { percentage: '7.9', flat: '0.20', notes: '5% referral + 2.9% processing + £0.20' },
-    EU: { percentage: '7.9', flat: '0.25', notes: '5% referral + 2.9% processing + €0.25' },
-    BR: { percentage: '7.9', flat: '0.00', notes: '5% referral + 2.9% processing' },
-    AU: { percentage: '10.9', flat: '0.30', notes: '8% referral + 2.9% processing + A$0.30' },
+    US: { transactionPct: '8', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
+    UK: { transactionPct: '5', processingPct: '2.9', processingFlat: '0.20', listingFee: '0' },
+    EU: { transactionPct: '5', processingPct: '2.9', processingFlat: '0.25', listingFee: '0' },
+    BR: { transactionPct: '5', processingPct: '2.9', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '8', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
   },
   EBAY: {
-    US: { percentage: '13.25', flat: '0.30', notes: '13.25% final value fee + $0.30/order' },
-    UK: { percentage: '12.8', flat: '0.25', notes: '12.8% final value fee + £0.25/order' },
-    EU: { percentage: '11', flat: '0.35', notes: '11% final value fee + €0.35/order' },
-    BR: { percentage: '16', flat: '0.00', notes: '16% final value fee' },
-    AU: { percentage: '13.2', flat: '0.30', notes: '13.2% final value fee + A$0.30/order' },
+    US: { transactionPct: '13.25', processingPct: '0', processingFlat: '0.30', listingFee: '0' },
+    UK: { transactionPct: '12.8', processingPct: '0', processingFlat: '0.25', listingFee: '0' },
+    EU: { transactionPct: '11', processingPct: '0', processingFlat: '0.35', listingFee: '0' },
+    BR: { transactionPct: '16', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '13.2', processingPct: '0', processingFlat: '0.30', listingFee: '0' },
   },
   CUSTOM: {
-    US: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
-    UK: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
-    EU: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
-    BR: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
-    AU: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
+    US: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    UK: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    EU: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    BR: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
   },
+}
+
+const EMPTY_FEES: FeeDefaults = { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' }
+
+function computeTotals(fees: FeeDefaults) {
+  const totalPct = (parseFloat(fees.transactionPct) || 0) + (parseFloat(fees.processingPct) || 0)
+  const totalFlat = (parseFloat(fees.processingFlat) || 0) + (parseFloat(fees.listingFee) || 0)
+  return { totalPct, totalFlat }
 }
 
 export default function Marketplaces() {
@@ -88,33 +112,39 @@ export default function Marketplaces() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<SalesPlatform | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ type: 'ETSY', shopName: '', percentage: '9.5', flat: '0.45', country: 'US' as Country })
+  const [formBase, setFormBase] = useState({ type: 'ETSY', shopName: '', country: 'US' as Country })
+  const [fees, setFees] = useState<FeeDefaults>({ ...PLATFORM_DEFAULTS['ETSY']['US'] })
 
   useEffect(() => {
     api<SalesPlatform[]>('/platforms').then(setPlatforms).finally(() => setLoading(false))
   }, [])
 
   function applyDefaults(type: string, country: Country) {
-    const defaults = PLATFORM_DEFAULTS[type]?.[country] ?? { percentage: '0', flat: '0.00' }
-    setForm((prev) => ({ ...prev, type, country, percentage: defaults.percentage, flat: defaults.flat }))
+    const defaults = PLATFORM_DEFAULTS[type]?.[country] ?? EMPTY_FEES
+    setFormBase((prev) => ({ ...prev, type, country }))
+    setFees({ ...defaults })
   }
 
   function openAdd() {
     setEditing(null)
-    const defaults = PLATFORM_DEFAULTS['ETSY']['US']
-    setForm({ type: 'ETSY', shopName: '', percentage: defaults.percentage, flat: defaults.flat, country: 'US' })
+    setFormBase({ type: 'ETSY', shopName: '', country: 'US' })
+    setFees({ ...PLATFORM_DEFAULTS['ETSY']['US'] })
     setShowModal(true)
   }
 
   function openEdit(p: SalesPlatform) {
     setEditing(p)
-    const fees = (p.feesConfig || {}) as Record<string, string>
-    setForm({
+    const fc = (p.feesConfig || {}) as Record<string, string>
+    setFormBase({
       type: p.type,
       shopName: p.shopName,
-      percentage: fees.percentage ?? '0',
-      flat: fees.flat ?? '0',
-      country: (fees.country as Country) || 'US',
+      country: (fc.country as Country) || 'US',
+    })
+    setFees({
+      transactionPct: fc.transactionPct ?? '0',
+      processingPct: fc.processingPct ?? '0',
+      processingFlat: fc.processingFlat ?? '0',
+      listingFee: fc.listingFee ?? '0',
     })
     setShowModal(true)
   }
@@ -123,10 +153,17 @@ export default function Marketplaces() {
     e.preventDefault()
     setSaving(true)
     try {
+      const { totalPct, totalFlat } = computeTotals(fees)
       const body = JSON.stringify({
-        type: form.type,
-        shopName: form.shopName,
-        feesConfig: { percentage: form.percentage, flat: form.flat, country: form.country },
+        type: formBase.type,
+        shopName: formBase.shopName,
+        feesConfig: {
+          ...fees,
+          country: formBase.country,
+          // Backend uses these two for pricing calculation
+          percentage: String(totalPct),
+          flat: String(totalFlat),
+        },
       })
       if (editing) {
         const updated = await api<SalesPlatform>(`/platforms/${editing.id}`, { method: 'PUT', body })
@@ -164,6 +201,23 @@ export default function Marketplaces() {
       // error
     }
   }
+
+  function formatFeeSummary(fc: Record<string, unknown>) {
+    const parts: string[] = []
+    const tp = parseFloat(String(fc.transactionPct ?? '0'))
+    const pp = parseFloat(String(fc.processingPct ?? '0'))
+    const pf = parseFloat(String(fc.processingFlat ?? '0'))
+    const lf = parseFloat(String(fc.listingFee ?? '0'))
+    if (tp > 0) parts.push(`${tp}%`)
+    if (pp > 0) parts.push(`${pp}%`)
+    if (pf > 0) parts.push(`${pf} flat`)
+    if (lf > 0) parts.push(`${lf} listing`)
+    return parts.length > 0 ? parts.join(' + ') : '0%'
+  }
+
+  const currency = COUNTRIES.find((c) => c.value === formBase.country)?.currency ?? '$'
+  const labels = PLATFORM_FEE_LABELS[formBase.type] ?? PLATFORM_FEE_LABELS['CUSTOM']
+  const { totalPct, totalFlat } = computeTotals(fees)
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -206,12 +260,7 @@ export default function Marketplaces() {
                   <TableCell><Badge variant={platformBadge[p.type] ?? 'default'}>{p.type}</Badge></TableCell>
                   <TableCell className="font-medium text-foreground">{p.shopName}</TableCell>
                   <TableCell>
-                    <span className="text-sm text-foreground">
-                      {((p.feesConfig as any)?.percentage ?? '0')}%
-                      {parseFloat((p.feesConfig as any)?.flat ?? '0') > 0 && (
-                        <span className="text-muted"> + {(p.feesConfig as any)?.flat}</span>
-                      )}
-                    </span>
+                    <span className="text-sm text-foreground">{formatFeeSummary(p.feesConfig)}</span>
                   </TableCell>
                   <TableCell>
                     <button onClick={() => toggleEnabled(p)} className="cursor-pointer">
@@ -237,69 +286,97 @@ export default function Marketplaces() {
             <label className="block text-sm font-medium text-foreground">Platform Type</label>
             <select
               className={selectClasses}
-              value={form.type}
-              onChange={(e) => applyDefaults(e.target.value, form.country)}
+              value={formBase.type}
+              onChange={(e) => applyDefaults(e.target.value, formBase.country)}
             >
               {PLATFORM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <Input label="Shop Name" value={form.shopName} onChange={(e) => setForm({ ...form, shopName: e.target.value })} required placeholder="e.g. My Etsy Shop" />
+          <Input label="Shop Name" value={formBase.shopName} onChange={(e) => setFormBase({ ...formBase, shopName: e.target.value })} required placeholder="e.g. My Etsy Shop" />
 
           {/* Country / Region */}
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">Country / Region</label>
             <select
               className={selectClasses}
-              value={form.country}
-              onChange={(e) => applyDefaults(form.type, e.target.value as Country)}
+              value={formBase.country}
+              onChange={(e) => applyDefaults(formBase.type, e.target.value as Country)}
             >
               {COUNTRIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
 
-          {/* Fee fields */}
+          {/* Fee fields — each component separate */}
           <div className="rounded-lg border border-border bg-surface-raised p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted uppercase tracking-wide">Platform Fees</p>
-              {form.type !== 'CUSTOM' && (
+              {formBase.type !== 'CUSTOM' && (
                 <button
                   type="button"
                   className="text-xs text-primary hover:underline"
-                  onClick={() => applyDefaults(form.type, form.country)}
+                  onClick={() => applyDefaults(formBase.type, formBase.country)}
                 >
                   Reset to defaults
                 </button>
               )}
             </div>
 
-            {/* Fee note */}
-            {PLATFORM_DEFAULTS[form.type]?.[form.country]?.notes && (
-              <p className="text-xs text-muted">
-                {PLATFORM_DEFAULTS[form.type][form.country].notes}
-              </p>
-            )}
+            <div className="space-y-3">
+              {labels.transactionPct && (
+                <Input
+                  label={labels.transactionPct}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  suffix="%"
+                  value={fees.transactionPct}
+                  onChange={(e) => setFees({ ...fees, transactionPct: e.target.value })}
+                />
+              )}
+              {labels.processingPct && (
+                <Input
+                  label={labels.processingPct}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  suffix="%"
+                  value={fees.processingPct}
+                  onChange={(e) => setFees({ ...fees, processingPct: e.target.value })}
+                />
+              )}
+              {labels.processingFlat && (
+                <Input
+                  label={labels.processingFlat}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  prefix={currency}
+                  value={fees.processingFlat}
+                  onChange={(e) => setFees({ ...fees, processingFlat: e.target.value })}
+                />
+              )}
+              {labels.listingFee && (
+                <Input
+                  label={labels.listingFee}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  prefix={currency}
+                  value={fees.listingFee}
+                  onChange={(e) => setFees({ ...fees, listingFee: e.target.value })}
+                />
+              )}
+            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Transaction Fee"
-                type="number"
-                step="0.01"
-                min="0"
-                suffix="%"
-                value={form.percentage}
-                onChange={(e) => setForm({ ...form, percentage: e.target.value })}
-                required
-              />
-              <Input
-                label="Flat Fee per Sale"
-                type="number"
-                step="0.01"
-                min="0"
-                prefix={COUNTRIES.find((c) => c.value === form.country)?.currency ?? '$'}
-                value={form.flat}
-                onChange={(e) => setForm({ ...form, flat: e.target.value })}
-                required
-              />
+            {/* Totals summary */}
+            <div className="border-t border-border pt-2 flex items-center justify-between text-xs text-muted">
+              <span>Total effective fees</span>
+              <span className="font-medium text-foreground">
+                {totalPct > 0 ? `${totalPct}%` : ''}
+                {totalPct > 0 && totalFlat > 0 ? ' + ' : ''}
+                {totalFlat > 0 ? `${currency}${totalFlat.toFixed(2)}` : ''}
+                {totalPct === 0 && totalFlat === 0 ? '0%' : ''}
+              </span>
             </div>
           </div>
 
