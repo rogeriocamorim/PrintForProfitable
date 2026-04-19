@@ -142,9 +142,14 @@ export default function Shipping() {
             <Input label="Customer Pays" type="number" step="0.01" prefix="$" value={form.customerPays} onChange={(e) => setForm({ ...form, customerPays: e.target.value })} required />
             <Input label="Your Postage Cost" type="number" step="0.01" prefix="$" value={form.postageCost} onChange={(e) => setForm({ ...form, postageCost: e.target.value })} required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Min Delivery Days" type="number" value={form.deliveryMinDays} onChange={(e) => setForm({ ...form, deliveryMinDays: e.target.value })} required />
-            <Input label="Max Delivery Days" type="number" value={form.deliveryMaxDays} onChange={(e) => setForm({ ...form, deliveryMaxDays: e.target.value })} required />
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Delivery Estimate</label>
+            <div className="flex items-center gap-2">
+              <Input type="number" min="1" value={form.deliveryMinDays} onChange={(e) => setForm({ ...form, deliveryMinDays: e.target.value })} required />
+              <span className="text-sm text-muted shrink-0">to</span>
+              <Input type="number" min="1" value={form.deliveryMaxDays} onChange={(e) => setForm({ ...form, deliveryMaxDays: e.target.value })} required />
+              <span className="text-sm text-muted shrink-0">days</span>
+            </div>
           </div>
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>

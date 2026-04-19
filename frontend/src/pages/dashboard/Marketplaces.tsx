@@ -38,39 +38,39 @@ const COUNTRIES: { value: Country; label: string; currency: string }[] = [
 // Sources: Official 2024-2025 fee schedules
 const PLATFORM_DEFAULTS: Record<string, Record<Country, { percentage: string; flat: string; notes: string }>> = {
   ETSY: {
-    US: { percentage: '6.5', flat: '0.20', notes: '6.5% transaction + $0.20 listing fee' },
-    UK: { percentage: '6.5', flat: '0.16', notes: '6.5% transaction + £0.16 listing fee' },
-    EU: { percentage: '6.5', flat: '0.18', notes: '6.5% transaction + €0.18 listing fee' },
-    BR: { percentage: '6.5', flat: '1.00', notes: '6.5% transaction + R$1.00 listing fee' },
-    AU: { percentage: '6.5', flat: '0.30', notes: '6.5% transaction + A$0.30 listing fee' },
+    US: { percentage: '9.5', flat: '0.45', notes: '6.5% transaction + 3% processing + $0.25 + $0.20 listing' },
+    UK: { percentage: '9.5', flat: '0.36', notes: '6.5% transaction + 3% processing + £0.20 + £0.16 listing' },
+    EU: { percentage: '9.5', flat: '0.43', notes: '6.5% transaction + 3% processing + €0.25 + €0.18 listing' },
+    BR: { percentage: '9.5', flat: '2.25', notes: '6.5% transaction + 3% processing + R$1.25 + R$1.00 listing' },
+    AU: { percentage: '9.5', flat: '0.55', notes: '6.5% transaction + 3% processing + A$0.25 + A$0.30 listing' },
   },
   AMAZON: {
-    US: { percentage: '15', flat: '0.00', notes: '~15% referral fee (category avg)' },
-    UK: { percentage: '15', flat: '0.00', notes: '~15% referral fee (category avg)' },
-    EU: { percentage: '15', flat: '0.00', notes: '~15% referral fee (category avg)' },
-    BR: { percentage: '16', flat: '0.00', notes: '~16% referral fee (category avg)' },
-    AU: { percentage: '15', flat: '0.00', notes: '~15% referral fee (category avg)' },
+    US: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
+    UK: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
+    EU: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
+    BR: { percentage: '16', flat: '0.00', notes: '16% referral fee (category avg)' },
+    AU: { percentage: '15', flat: '0.00', notes: '15% referral fee (category avg)' },
   },
   SHOPIFY: {
-    US: { percentage: '2.9', flat: '0.30', notes: 'Shopify Payments credit card fee' },
-    UK: { percentage: '2.2', flat: '0.20', notes: 'Shopify Payments credit card fee' },
-    EU: { percentage: '2.2', flat: '0.25', notes: 'Shopify Payments credit card fee' },
-    BR: { percentage: '3.5', flat: '0.00', notes: 'Shopify Payments credit card fee' },
-    AU: { percentage: '2.9', flat: '0.30', notes: 'Shopify Payments credit card fee' },
+    US: { percentage: '2.9', flat: '0.30', notes: '2.9% + $0.30 payment processing' },
+    UK: { percentage: '2.2', flat: '0.20', notes: '2.2% + £0.20 payment processing' },
+    EU: { percentage: '2.2', flat: '0.25', notes: '2.2% + €0.25 payment processing' },
+    BR: { percentage: '3.5', flat: '0.00', notes: '3.5% payment processing' },
+    AU: { percentage: '2.9', flat: '0.30', notes: '2.9% + A$0.30 payment processing' },
   },
   TIKTOK: {
-    US: { percentage: '8', flat: '0.00', notes: '8% referral fee' },
-    UK: { percentage: '5', flat: '0.00', notes: '5% referral fee' },
-    EU: { percentage: '5', flat: '0.00', notes: '5% referral fee' },
-    BR: { percentage: '5', flat: '0.00', notes: '5% referral fee' },
-    AU: { percentage: '8', flat: '0.00', notes: '8% referral fee' },
+    US: { percentage: '10.9', flat: '0.30', notes: '8% referral + 2.9% processing + $0.30' },
+    UK: { percentage: '7.9', flat: '0.20', notes: '5% referral + 2.9% processing + £0.20' },
+    EU: { percentage: '7.9', flat: '0.25', notes: '5% referral + 2.9% processing + €0.25' },
+    BR: { percentage: '7.9', flat: '0.00', notes: '5% referral + 2.9% processing' },
+    AU: { percentage: '10.9', flat: '0.30', notes: '8% referral + 2.9% processing + A$0.30' },
   },
   EBAY: {
-    US: { percentage: '13.25', flat: '0.30', notes: '~13.25% final value fee + $0.30/order' },
-    UK: { percentage: '12.8', flat: '0.25', notes: '~12.8% final value fee + £0.25/order' },
-    EU: { percentage: '11', flat: '0.35', notes: '~11% final value fee + €0.35/order' },
-    BR: { percentage: '16', flat: '0.00', notes: '~16% final value fee' },
-    AU: { percentage: '13.2', flat: '0.30', notes: '~13.2% final value fee + A$0.30/order' },
+    US: { percentage: '13.25', flat: '0.30', notes: '13.25% final value fee + $0.30/order' },
+    UK: { percentage: '12.8', flat: '0.25', notes: '12.8% final value fee + £0.25/order' },
+    EU: { percentage: '11', flat: '0.35', notes: '11% final value fee + €0.35/order' },
+    BR: { percentage: '16', flat: '0.00', notes: '16% final value fee' },
+    AU: { percentage: '13.2', flat: '0.30', notes: '13.2% final value fee + A$0.30/order' },
   },
   CUSTOM: {
     US: { percentage: '0', flat: '0.00', notes: 'Set your own fees' },
@@ -88,7 +88,7 @@ export default function Marketplaces() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<SalesPlatform | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ type: 'ETSY', shopName: '', percentage: '6.5', flat: '0.20', country: 'US' as Country })
+  const [form, setForm] = useState({ type: 'ETSY', shopName: '', percentage: '9.5', flat: '0.45', country: 'US' as Country })
 
   useEffect(() => {
     api<SalesPlatform[]>('/platforms').then(setPlatforms).finally(() => setLoading(false))
