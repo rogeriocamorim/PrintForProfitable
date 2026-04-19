@@ -90,18 +90,31 @@ Price     = Total / (1 - margin/100) + platform_fees + tax
 ## What's done
 
 - Full auth (local + conditional OAuth), register → 4-step wizard → dashboard
-- Dashboard with collapsible sidebar, dark navy/orange theme (#E8622C), Ubuntu font
+- Dashboard with collapsible sidebar, orange accent (#E8622C), Ubuntu font
 - Admin: stats, user CRUD (search/pagination/role/active), farm listing, impersonation, settings
 - Reusable UI: Button (CVA), Input (prefix/suffix), Card, Table, Modal, Badge, Select, EmptyState
 - Docker Compose (postgres + backend + frontend/nginx), ARM64 compatible
 - Backend CRUD routes: printers, filaments, platforms, shipping, farms/tax-rates
+- .3mf file parser: PrusaSlicer, BambuStudio, OrcaSlicer, Cura (adm-zip + fast-xml-parser)
+- Printer presets: all Bambu Lab models + Prusa + Creality + Voron + Elegoo with avg wattage
 - 7 functional dashboard pages: Dashboard, Models, Printers, Filaments, Marketplaces, Shipping, FarmSettings
 - 6 placeholder pages: Analytics, Orders, PrintQueue, Users, Supplies, Integrations
 - All sidebar links wired to real routes (no dead links)
+- UI modernized with semantic theme tokens (zero hardcoded gray-* classes)
+- 47 tests: 39 backend integration (Vitest+Supertest), 8 E2E (Playwright)
+
+## Theme tokens (index.css)
+
+All colors use CSS custom properties. **Never use hardcoded Tailwind gray classes** — use these tokens instead:
+- `text-foreground` (not text-gray-900), `text-muted` (not text-gray-400/500/600)
+- `border-border` (not border-gray-200/300), `border-border-light` (not border-gray-100)
+- `bg-surface-raised` (not bg-gray-50), `hover:bg-surface-raised` (not hover:bg-gray-100)
+- `shadow-xs`, `shadow-card`, `shadow-elevated`, `shadow-dropdown` for elevation
+- `focus:ring-ring/20` for focus states, `rounded-xl` default card radius
+- Admin pages intentionally use dark slate theme (slate-700/800) — only add transitions, don't change to light tokens
 
 ## What's next
 
-- .3mf file parser (extract print time, filament usage from uploads)
 - Batch pricing (price multiple models across platforms)
 - Order tracking, analytics charts, inventory tracking
 - Test OAuth with real credentials
