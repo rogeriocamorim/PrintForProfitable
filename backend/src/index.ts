@@ -59,8 +59,10 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Serve uploaded thumbnails statically
+// Serve uploaded thumbnails and images statically
 app.use("/api/uploads/thumbnails", express.static(thumbnailsDir));
+const imagesDir = path.join(__dirname, "../uploads/images");
+app.use("/api/uploads/images", express.static(imagesDir));
 
 // Routes
 app.use("/api/auth", authRoutes);

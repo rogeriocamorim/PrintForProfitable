@@ -110,11 +110,19 @@ GET `/models/:id` returns `platformPricing[]` with per-platform selling price, f
 - Thumbnail extraction from .3mf files, served at /api/uploads/thumbnails
 - Per-marketplace pricing breakdown (selling price, fees, profit per platform)
 - Printer presets: all Bambu Lab models + Prusa + Creality + Voron + Elegoo with avg wattage
+- Full Edit Model page: model info, SKUs, category, parts/filaments, labor (prep+post), supplies, platform assignments, cost summary
 - 7 functional dashboard pages: Dashboard, Models, Printers, Filaments, Marketplaces, Shipping, FarmSettings
 - 6 placeholder pages: Analytics, Orders, PrintQueue, Users, Supplies, Integrations
 - All sidebar links wired to real routes (no dead links)
 - UI modernized with semantic theme tokens (zero hardcoded gray-* classes)
 - 47 tests: 39 backend integration (Vitest+Supertest), 8 E2E (Playwright)
+
+## Edit Model schema
+
+Model3D has: `category`, `buildPlateQty`, `designer`, `marketplaceName`, `hasVariations`, `hasPersonalization`, `prepTimeMinutes`, `prepCostPerHour`, `postTimeMinutes`, `postCostPerHour`, `imagePath`.
+Related models: `ModelSku`, `ModelPart` → `ModelPartFilament`, `ModelSupply`, `ModelPlatformAssignment` (unique on modelId+platformId).
+PUT `/models/:id` accepts `skus[]`, `parts[].filaments[]`, `supplies[]`, `platformAssignments[]` — all replace-all semantics (delete + recreate).
+Image upload: POST `/models/:id/image` (multipart), served at `/api/uploads/images/<filename>`.
 
 ## Theme tokens (index.css)
 

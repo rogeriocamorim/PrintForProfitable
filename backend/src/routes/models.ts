@@ -331,12 +331,25 @@ router.get("/:id", async (req: Request, res: Response) => {
       include: {
         filament: true,
         printer: true,
+        skus: true,
+        parts: {
+          include: { filaments: { include: { filament: true } } },
+          orderBy: { sortOrder: "asc" },
+        },
+        supplies: true,
+        platformAssignments: {
+          include: {
+            platform: true,
+            shippingProfile: true,
+          },
+        },
         farm: {
           include: {
             taxRates: true,
             salesPlatforms: true,
             printers: true,
             shippingProfiles: true,
+            filaments: true,
           },
         },
       },
@@ -357,13 +370,33 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const printTimeHours = model.printTimeMinutes / 60;
     const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
-    const laborCost = (farm.laborRate / 60) * (farm.prepTimeMinutes || 10); // fixed prep time, not print-time-based
-    const filamentCostPerGram = model.filament
-      ? model.filament.costPerSpool / model.filament.spoolWeight
-      : 0.02; // fallback
-    const materialCost = filamentCostPerGram * model.filamentUsageGrams;
 
-    const baseCost = electricityCost + laborCost + materialCost;
+    // Labor: model-level prep/post times and rates (fall back to farm defaults)
+    const prepRate = model.prepCostPerHour ?? farm.laborRate;
+    const postRate = model.postCostPerHour ?? farm.laborRate;
+    const prepCost = (prepRate / 60) * model.prepTimeMinutes;
+    const postCost = (postRate / 60) * model.postTimeMinutes;
+    const laborCost = prepCost + postCost;
+
+    // Filament cost: from parts if available, otherwise legacy single-filament
+    let materialCost = 0;
+    if (model.parts.length > 0) {
+      for (const part of model.parts) {
+        for (const pf of part.filaments) {
+          materialCost += pf.totalCost;
+        }
+      }
+    } else {
+      const filamentCostPerGram = model.filament
+        ? model.filament.costPerSpool / model.filament.spoolWeight
+        : 0.02;
+      materialCost = filamentCostPerGram * model.filamentUsageGrams;
+    }
+
+    // Supplies cost
+    const suppliesCost = model.supplies.reduce((sum, s) => sum + s.cost, 0);
+
+    const baseCost = electricityCost + laborCost + materialCost + suppliesCost;
 
     const totalTaxRate = farm.taxRates.reduce((sum: number, t: any) => sum + t.rate, 0) / 100;
     const taxAmount = baseCost * totalTaxRate;
@@ -394,8 +427,10 @@ router.get("/:id", async (req: Request, res: Response) => {
         printerWatts,
         electricityCost: +electricityCost.toFixed(2),
         laborCost: +laborCost.toFixed(2),
-        prepTimeMinutes: farm.prepTimeMinutes || 10,
+        prepCost: +prepCost.toFixed(2),
+        postCost: +postCost.toFixed(2),
         materialCost: +materialCost.toFixed(2),
+        suppliesCost: +suppliesCost.toFixed(2),
         baseCost: +baseCost.toFixed(2),
         taxAmount: +taxAmount.toFixed(2),
         totalCost: +totalCost.toFixed(2),
@@ -412,7 +447,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// PUT /:id - Update model
+// PUT /:id - Update model (full edit)
 router.put("/:id", async (req: Request, res: Response) => {
   try {
     const farmId = await getFarmId(req.user!.id);
@@ -435,10 +470,27 @@ router.put("/:id", async (req: Request, res: Response) => {
       printTimeMinutes,
       filamentUsageGrams,
       filamentId,
+      printerId,
       calculatedCost,
       suggestedPrice,
+      category,
+      buildPlateQty,
+      designer,
+      marketplaceName,
+      hasVariations,
+      hasPersonalization,
+      prepTimeMinutes,
+      prepCostPerHour,
+      postTimeMinutes,
+      postCostPerHour,
+      // Related data
+      skus,
+      parts,
+      supplies,
+      platformAssignments,
     } = req.body;
 
+    // Update model scalar fields
     const updated = await prisma.model3D.update({
       where: { id: req.params.id },
       data: {
@@ -446,16 +498,151 @@ router.put("/:id", async (req: Request, res: Response) => {
         ...(printTimeMinutes !== undefined && { printTimeMinutes }),
         ...(filamentUsageGrams !== undefined && { filamentUsageGrams }),
         ...(filamentId !== undefined && { filamentId: filamentId || null }),
+        ...(printerId !== undefined && { printerId: printerId || null }),
         ...(calculatedCost !== undefined && { calculatedCost }),
         ...(suggestedPrice !== undefined && { suggestedPrice }),
+        ...(category !== undefined && { category: category || null }),
+        ...(buildPlateQty !== undefined && { buildPlateQty }),
+        ...(designer !== undefined && { designer: designer || null }),
+        ...(marketplaceName !== undefined && { marketplaceName: marketplaceName || null }),
+        ...(hasVariations !== undefined && { hasVariations }),
+        ...(hasPersonalization !== undefined && { hasPersonalization }),
+        ...(prepTimeMinutes !== undefined && { prepTimeMinutes }),
+        ...(prepCostPerHour !== undefined && { prepCostPerHour: prepCostPerHour || null }),
+        ...(postTimeMinutes !== undefined && { postTimeMinutes }),
+        ...(postCostPerHour !== undefined && { postCostPerHour: postCostPerHour || null }),
       },
-      include: { filament: true },
     });
 
-    res.json(updated);
+    // Update SKUs (replace all)
+    if (skus !== undefined) {
+      await prisma.modelSku.deleteMany({ where: { modelId: req.params.id } });
+      if (skus.length > 0) {
+        await prisma.modelSku.createMany({
+          data: skus.map((s: { sku: string }) => ({
+            modelId: req.params.id,
+            sku: s.sku,
+          })),
+        });
+      }
+    }
+
+    // Update Parts & Filaments (replace all)
+    if (parts !== undefined) {
+      // Delete existing parts (cascades to filaments)
+      await prisma.modelPart.deleteMany({ where: { modelId: req.params.id } });
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        const createdPart = await prisma.modelPart.create({
+          data: {
+            modelId: req.params.id,
+            name: p.name || `Plate ${i + 1}`,
+            sortOrder: i,
+          },
+        });
+        if (p.filaments && p.filaments.length > 0) {
+          await prisma.modelPartFilament.createMany({
+            data: p.filaments.map((f: any) => ({
+              partId: createdPart.id,
+              name: f.name,
+              filamentId: f.filamentId || null,
+              grams: f.grams,
+              totalCost: f.totalCost,
+            })),
+          });
+        }
+      }
+    }
+
+    // Update Supplies (replace all)
+    if (supplies !== undefined) {
+      await prisma.modelSupply.deleteMany({ where: { modelId: req.params.id } });
+      if (supplies.length > 0) {
+        await prisma.modelSupply.createMany({
+          data: supplies.map((s: { name: string; cost: number }) => ({
+            modelId: req.params.id,
+            name: s.name,
+            cost: s.cost,
+          })),
+        });
+      }
+    }
+
+    // Update Platform Assignments (replace all)
+    if (platformAssignments !== undefined) {
+      await prisma.modelPlatformAssignment.deleteMany({ where: { modelId: req.params.id } });
+      if (platformAssignments.length > 0) {
+        await prisma.modelPlatformAssignment.createMany({
+          data: platformAssignments.map((a: any) => ({
+            modelId: req.params.id,
+            platformId: a.platformId,
+            shippingProfileId: a.shippingProfileId || null,
+            enabled: a.enabled !== false,
+          })),
+        });
+      }
+    }
+
+    // Return full model with all relations
+    const fullModel = await prisma.model3D.findUnique({
+      where: { id: req.params.id },
+      include: {
+        filament: true,
+        printer: true,
+        skus: true,
+        parts: {
+          include: { filaments: { include: { filament: true } } },
+          orderBy: { sortOrder: "asc" },
+        },
+        supplies: true,
+        platformAssignments: {
+          include: { platform: true, shippingProfile: true },
+        },
+      },
+    });
+
+    res.json(fullModel);
   } catch (err) {
     console.error("Update model error:", err);
     res.status(500).json({ error: "Failed to update model" });
+  }
+});
+
+// POST /:id/image - Upload model image
+const imageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = path.join(__dirname, "../../uploads/images");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+router.post("/:id/image", imageUpload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const farmId = await getFarmId(req.user!.id);
+    if (!farmId || !req.file) {
+      res.status(400).json({ error: "No file uploaded or farm not found" });
+      return;
+    }
+    const model = await prisma.model3D.update({
+      where: { id: req.params.id },
+      data: { imagePath: req.file.filename },
+    });
+    res.json({ imagePath: model.imagePath, imageUrl: `/api/uploads/images/${model.imagePath}` });
+  } catch (err) {
+    console.error("Upload image error:", err);
+    res.status(500).json({ error: "Failed to upload image" });
   }
 });
 

@@ -96,8 +96,9 @@ model Filament {
   colors       Json     @default("[]")
   createdAt    DateTime @default(now())
 
-  farm   Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  models Model3D[]
+  farm               Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  models             Model3D[]
+  modelPartFilaments ModelPartFilament[]
 
   @@map("filaments")
 }
@@ -125,7 +126,8 @@ model SalesPlatform {
   enabled    Boolean      @default(true)
   createdAt  DateTime     @default(now())
 
-  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm                    Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  modelPlatformAssignments ModelPlatformAssignment[]
 
   @@map("sales_platforms")
 }
@@ -140,30 +142,109 @@ model ShippingProfile {
   deliveryMaxDays Int      @default(5)
   createdAt       DateTime @default(now())
 
-  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm                    Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  modelPlatformAssignments ModelPlatformAssignment[]
 
   @@map("shipping_profiles")
 }
 
 model Model3D {
-  id                 String   @id @default(cuid())
-  farmId             String
-  name               String
-  fileName           String
-  originalFileName   String?
-  slicer             String?
-  thumbnailPath      String?
-  printTimeMinutes   Float
-  filamentUsageGrams Float
-  filamentId         String?
-  printerId          String?
-  calculatedCost     Float
-  suggestedPrice     Float
-  createdAt          DateTime @default(now())
+  id                   String   @id @default(cuid())
+  farmId               String
+  name                 String
+  fileName             String
+  originalFileName     String?
+  slicer               String?
+  thumbnailPath        String?
+  imagePath            String?
+  category             String?
+  buildPlateQty        Int      @default(1)
+  designer             String?
+  marketplaceName      String?
+  hasVariations        Boolean  @default(false)
+  hasPersonalization   Boolean  @default(false)
+  printTimeMinutes     Float
+  filamentUsageGrams   Float
+  filamentId           String?
+  printerId            String?
+  // Model-level labor overrides (defaults from farm)
+  prepTimeMinutes      Float    @default(1)
+  prepCostPerHour      Float?
+  postTimeMinutes      Float    @default(1)
+  postCostPerHour      Float?
+  calculatedCost       Float
+  suggestedPrice       Float
+  createdAt            DateTime @default(now())
 
-  farm     Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  filament Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
-  printer  Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
+  farm      Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  filament  Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
+  printer   Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
+  skus      ModelSku[]
+  parts     ModelPart[]
+  supplies  ModelSupply[]
+  platformAssignments ModelPlatformAssignment[]
 
   @@map("models_3d")
+}
+
+model ModelSku {
+  id       String @id @default(cuid())
+  modelId  String
+  sku      String
+
+  model Model3D @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("model_skus")
+}
+
+model ModelPart {
+  id        String @id @default(cuid())
+  modelId   String
+  name      String @default("Plate 1")
+  sortOrder Int    @default(0)
+
+  model     Model3D            @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  filaments ModelPartFilament[]
+
+  @@map("model_parts")
+}
+
+model ModelPartFilament {
+  id         String  @id @default(cuid())
+  partId     String
+  name       String
+  filamentId String?
+  grams      Float
+  totalCost  Float
+
+  part     ModelPart @relation(fields: [partId], references: [id], onDelete: Cascade)
+  filament Filament? @relation(fields: [filamentId], references: [id], onDelete: SetNull)
+
+  @@map("model_part_filaments")
+}
+
+model ModelSupply {
+  id      String @id @default(cuid())
+  modelId String
+  name    String
+  cost    Float
+
+  model Model3D @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("model_supplies")
+}
+
+model ModelPlatformAssignment {
+  id                String  @id @default(cuid())
+  modelId           String
+  platformId        String
+  shippingProfileId String?
+  enabled           Boolean @default(true)
+
+  model           Model3D          @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  platform        SalesPlatform    @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  shippingProfile ShippingProfile? @relation(fields: [shippingProfileId], references: [id], onDelete: SetNull)
+
+  @@unique([modelId, platformId])
+  @@map("model_platform_assignments")
 }
