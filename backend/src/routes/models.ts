@@ -126,17 +126,94 @@ router.get("/", async (req: Request, res: Response) => {
 
     const models = await prisma.model3D.findMany({
       where: { farmId },
-      include: { filament: true, printer: true },
+      include: {
+        filament: true,
+        printer: true,
+        parts: { include: { filaments: true } },
+        supplies: true,
+        skus: true,
+        farm: {
+          include: {
+            taxRates: true,
+            salesPlatforms: true,
+            printers: true,
+            shippingProfiles: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 
-    // Add thumbnail URLs
-    const modelsWithUrls = models.map((m) => ({
-      ...m,
-      thumbnailUrl: m.thumbnailPath ? `/api/uploads/thumbnails/${m.thumbnailPath}` : null,
-    }));
+    // Compute pricing summary for each model
+    const modelsWithPricing = models.map((m) => {
+      const farm = m.farm;
+      const printer = m.printer ?? farm.printers[0] ?? null;
+      const printerWatts = printer?.powerConsumption ?? 200;
+      const printTimeHours = m.printTimeMinutes / 60;
+      const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
+      const prepRate = m.prepCostPerHour ?? farm.laborRate;
+      const postRate = m.postCostPerHour ?? farm.laborRate;
+      const prepCost = (prepRate / 60) * m.prepTimeMinutes;
+      const postCost = (postRate / 60) * m.postTimeMinutes;
+      const laborCost = prepCost + postCost;
 
-    res.json(modelsWithUrls);
+      // Machinery depreciation: (purchasePrice / lifetimeHours) * printHours
+      const machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+        ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours
+        : 0;
+
+      // Maintenance: maintenanceRate * printHours
+      const maintenanceCost = farm.maintenanceRate * printTimeHours;
+
+      let materialCost = 0;
+      if (m.parts.length > 0) {
+        for (const part of m.parts) {
+          for (const pf of part.filaments) {
+            materialCost += pf.totalCost;
+          }
+        }
+      } else {
+        const filamentCostPerGram = m.filament ? m.filament.costPerSpool / m.filament.spoolWeight : 0.02;
+        materialCost = filamentCostPerGram * m.filamentUsageGrams;
+      }
+
+      const suppliesCost = m.supplies.reduce((sum, s) => sum + s.cost, 0);
+      const baseCost = electricityCost + laborCost + materialCost + suppliesCost + machineryCost + maintenanceCost;
+      const totalTaxRate = farm.taxRates.reduce((sum: number, t: any) => sum + t.rate, 0) / 100;
+      const taxAmount = baseCost * totalTaxRate;
+      const totalCost = baseCost + taxAmount;
+
+      const shipping = farm.shippingProfiles[0] || null;
+      const shippingCost = shipping ? shipping.postageCost : 0;
+      const shippingRevenue = shipping ? shipping.customerPays : 0;
+
+      const platformPricing = computePlatformPricing(totalCost, shippingCost, shippingRevenue, farm.targetProfitMargin, farm.salesPlatforms);
+
+      // Avg across platforms for list display
+      const avgSellingPrice = platformPricing.length > 0 ? platformPricing.reduce((s, p) => s + p.sellingPrice, 0) / platformPricing.length : totalCost * (1 + farm.targetProfitMargin / 100);
+      const avgProfit = platformPricing.length > 0 ? platformPricing.reduce((s, p) => s + p.profit, 0) / platformPricing.length : avgSellingPrice - totalCost;
+      const avgProfitMargin = platformPricing.length > 0 ? platformPricing.reduce((s, p) => s + p.profitMargin, 0) / platformPricing.length : farm.targetProfitMargin;
+      const profitPerHour = printTimeHours > 0 ? avgProfit / printTimeHours : 0;
+
+      const { farm: _farm, parts: _parts, supplies: _supplies, ...modelData } = m;
+      return {
+        ...modelData,
+        thumbnailUrl: m.thumbnailPath ? `/api/uploads/thumbnails/${m.thumbnailPath}` : null,
+        pricingSummary: {
+          totalCost: +totalCost.toFixed(2),
+          avgSellingPrice: +avgSellingPrice.toFixed(2),
+          avgProfit: +avgProfit.toFixed(2),
+          avgProfitPerHour: +profitPerHour.toFixed(2),
+          avgProfitMargin: +avgProfitMargin.toFixed(1),
+          shippingCost: +shippingCost.toFixed(2),
+          machineryCost: +machineryCost.toFixed(2),
+          maintenanceCost: +maintenanceCost.toFixed(2),
+          platformPricing,
+        },
+      };
+    });
+
+    res.json(modelsWithPricing);
   } catch (err) {
     console.error("List models error:", err);
     res.status(500).json({ error: "Failed to list models" });
@@ -271,6 +348,7 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
 
     // Auto-extract from .3mf if values not provided
     const ext = path.extname(req.file.originalname).toLowerCase();
+    let plates: Array<{ index: number; printTimeMinutes: number; filamentUsageGrams: number; filaments: Array<{ id: number; type: string; color: string; usedGrams: number; usedMeters: number }> }> = [];
     if (ext === ".3mf") {
       try {
         const metadata = parseThreeMF(req.file.path);
@@ -281,6 +359,7 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
           parsedFilamentGrams = metadata.filamentUsageGrams;
         }
         slicer = metadata.slicer;
+        plates = metadata.plates;
         // Save thumbnail
         const thumbName = saveThumbnail(metadata.thumbnail, req.file.filename.replace(/\.[^.]+$/, ''));
         if (thumbName) thumbnailPath = thumbName;
@@ -288,6 +367,9 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
         console.error("3MF auto-parse error:", parseErr);
       }
     }
+
+    // Get farm filaments for auto-matching
+    const farmFilaments = await prisma.filament.findMany({ where: { farmId } });
 
     const model = await prisma.model3D.create({
       data: {
@@ -303,8 +385,36 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
         printerId: printerId || null,
         calculatedCost: 0,
         suggestedPrice: 0,
+        // Create parts from parsed plate data
+        parts: plates.length > 0 ? {
+          create: plates.map((plate, idx) => ({
+            name: `Plate ${plate.index}`,
+            sortOrder: idx,
+            filaments: {
+              create: plate.filaments.map((f) => {
+                // Try to auto-match farm filament by type
+                const matchedFilament = farmFilaments.find(
+                  (ff) => ff.material.toLowerCase() === f.type.toLowerCase()
+                );
+                const costPerGram = matchedFilament
+                  ? matchedFilament.costPerSpool / matchedFilament.spoolWeight
+                  : 0.02; // default cost
+                return {
+                  name: `${f.type}${f.color ? ` (${f.color})` : ''}`,
+                  filamentId: matchedFilament?.id || null,
+                  grams: f.usedGrams,
+                  totalCost: Math.round(f.usedGrams * costPerGram * 100) / 100,
+                };
+              }),
+            },
+          })),
+        } : undefined,
       },
-      include: { filament: true, printer: true },
+      include: {
+        filament: true,
+        printer: true,
+        parts: { include: { filaments: true } },
+      },
     });
 
     res.status(201).json({
@@ -363,10 +473,9 @@ router.get("/:id", async (req: Request, res: Response) => {
     // Compute pricing breakdown
     const farm = model.farm;
 
-    // Use assigned printer wattage, or first farm printer, or fallback 200W
-    const printerWatts = model.printer?.powerConsumption
-      ?? farm.printers[0]?.powerConsumption
-      ?? 200;
+    // Use assigned printer, or first farm printer, or fallback
+    const printer = model.printer ?? farm.printers[0] ?? null;
+    const printerWatts = printer?.powerConsumption ?? 200;
 
     const printTimeHours = model.printTimeMinutes / 60;
     const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
@@ -377,6 +486,14 @@ router.get("/:id", async (req: Request, res: Response) => {
     const prepCost = (prepRate / 60) * model.prepTimeMinutes;
     const postCost = (postRate / 60) * model.postTimeMinutes;
     const laborCost = prepCost + postCost;
+
+    // Machinery depreciation: (purchasePrice / lifetimeHours) * printHours
+    const machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+      ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours
+      : 0;
+
+    // Maintenance: maintenanceRate * printHours
+    const maintenanceCost = farm.maintenanceRate * printTimeHours;
 
     // Filament cost: from parts if available, otherwise legacy single-filament
     let materialCost = 0;
@@ -396,7 +513,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     // Supplies cost
     const suppliesCost = model.supplies.reduce((sum, s) => sum + s.cost, 0);
 
-    const baseCost = electricityCost + laborCost + materialCost + suppliesCost;
+    const baseCost = electricityCost + laborCost + materialCost + suppliesCost + machineryCost + maintenanceCost;
 
     const totalTaxRate = farm.taxRates.reduce((sum: number, t: any) => sum + t.rate, 0) / 100;
     const taxAmount = baseCost * totalTaxRate;
@@ -429,6 +546,8 @@ router.get("/:id", async (req: Request, res: Response) => {
         laborCost: +laborCost.toFixed(2),
         prepCost: +prepCost.toFixed(2),
         postCost: +postCost.toFixed(2),
+        machineryCost: +machineryCost.toFixed(2),
+        maintenanceCost: +maintenanceCost.toFixed(2),
         materialCost: +materialCost.toFixed(2),
         suppliesCost: +suppliesCost.toFixed(2),
         baseCost: +baseCost.toFixed(2),

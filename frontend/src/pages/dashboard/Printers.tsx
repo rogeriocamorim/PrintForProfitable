@@ -46,6 +46,8 @@ interface Printer {
   brand: string
   model: string
   powerConsumption: number
+  purchasePrice: number
+  expectedLifetimeHours: number
   imageUrl: string | null
   createdAt: string
 }
@@ -56,7 +58,7 @@ export default function Printers() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Printer | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ brand: '', model: '', powerConsumption: '200' })
+  const [form, setForm] = useState({ brand: '', model: '', powerConsumption: '200', purchasePrice: '0', expectedLifetimeHours: '5000' })
 
   useEffect(() => {
     api<Printer[]>('/printers').then(setPrinters).finally(() => setLoading(false))
@@ -64,13 +66,13 @@ export default function Printers() {
 
   function openAdd() {
     setEditing(null)
-    setForm({ brand: '', model: '', powerConsumption: '200' })
+    setForm({ brand: '', model: '', powerConsumption: '200', purchasePrice: '0', expectedLifetimeHours: '5000' })
     setShowModal(true)
   }
 
   function openEdit(p: Printer) {
     setEditing(p)
-    setForm({ brand: p.brand, model: p.model, powerConsumption: String(p.powerConsumption) })
+    setForm({ brand: p.brand, model: p.model, powerConsumption: String(p.powerConsumption), purchasePrice: String(p.purchasePrice || 0), expectedLifetimeHours: String(p.expectedLifetimeHours || 5000) })
     setShowModal(true)
   }
 
@@ -82,6 +84,8 @@ export default function Printers() {
         brand: form.brand,
         model: form.model,
         powerConsumption: parseFloat(form.powerConsumption),
+        purchasePrice: parseFloat(form.purchasePrice),
+        expectedLifetimeHours: parseFloat(form.expectedLifetimeHours),
       })
       if (editing) {
         const updated = await api<Printer>(`/printers/${editing.id}`, { method: 'PUT', body })
@@ -203,6 +207,8 @@ export default function Printers() {
           <Input label="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} required placeholder="e.g. Bambu Lab" />
           <Input label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} required placeholder="e.g. X1 Carbon" />
           <Input label="Power Consumption" type="number" suffix="watts" value={form.powerConsumption} onChange={(e) => setForm({ ...form, powerConsumption: e.target.value })} required />
+          <Input label="Purchase Price" type="number" step="0.01" prefix="$" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
+          <Input label="Expected Lifetime" type="number" suffix="hours" value={form.expectedLifetimeHours} onChange={(e) => setForm({ ...form, expectedLifetimeHours: e.target.value })} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button type="submit" className="flex-1" disabled={saving}>

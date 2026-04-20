@@ -37,7 +37,7 @@ router.post("/", async (req: Request, res: Response) => {
     const farmId = await getFarmId(req.user!.id);
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
-    const { brand, model, powerConsumption, imageUrl } = req.body;
+    const { brand, model, powerConsumption, imageUrl, purchasePrice, expectedLifetimeHours } = req.body;
     if (!brand || !model) {
       res.status(400).json({ error: "Brand and model are required" });
       return;
@@ -50,6 +50,8 @@ router.post("/", async (req: Request, res: Response) => {
         model,
         powerConsumption: powerConsumption ?? 200,
         imageUrl,
+        purchasePrice: purchasePrice ?? 0,
+        expectedLifetimeHours: expectedLifetimeHours ?? 5000,
       },
     });
     res.status(201).json(printer);
@@ -70,7 +72,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     });
     if (!existing) { res.status(404).json({ error: "Printer not found" }); return; }
 
-    const { brand, model, powerConsumption, imageUrl } = req.body;
+    const { brand, model, powerConsumption, imageUrl, purchasePrice, expectedLifetimeHours } = req.body;
     const updated = await prisma.printer.update({
       where: { id: req.params.id },
       data: {
@@ -78,6 +80,8 @@ router.put("/:id", async (req: Request, res: Response) => {
         ...(model !== undefined && { model }),
         ...(powerConsumption !== undefined && { powerConsumption }),
         ...(imageUrl !== undefined && { imageUrl }),
+        ...(purchasePrice !== undefined && { purchasePrice }),
+        ...(expectedLifetimeHours !== undefined && { expectedLifetimeHours }),
       },
     });
     res.json(updated);

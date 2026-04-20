@@ -44,7 +44,7 @@ router.put("/", async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, electricityRate, laborRate, prepTimeMinutes, targetProfitMargin } = req.body;
+    const { name, electricityRate, laborRate, prepTimeMinutes, targetProfitMargin, maintenanceRate } = req.body;
 
     const updated = await prisma.farm.update({
       where: { id: farm.id },
@@ -54,6 +54,7 @@ router.put("/", async (req: Request, res: Response) => {
         ...(laborRate !== undefined && { laborRate }),
         ...(prepTimeMinutes !== undefined && { prepTimeMinutes }),
         ...(targetProfitMargin !== undefined && { targetProfitMargin }),
+        ...(maintenanceRate !== undefined && { maintenanceRate }),
       },
       include: {
         taxRates: true,

@@ -14,10 +14,19 @@ export interface ThreeMFMetadata {
   plates: PlateInfo[];
 }
 
+interface FilamentDetail {
+  id: number;
+  type: string;
+  color: string;
+  usedGrams: number;
+  usedMeters: number;
+}
+
 interface PlateInfo {
   index: number;
   printTimeMinutes: number;
   filamentUsageGrams: number;
+  filaments: FilamentDetail[];
 }
 
 const xmlParser = new XMLParser({
@@ -124,6 +133,22 @@ function tryPrusaSlicer(
     result.filamentType = typeMatch[1];
   }
 
+  // Build a single plate entry for consistency
+  if (result.printTimeMinutes != null || result.filamentUsageGrams != null) {
+    result.plates.push({
+      index: 1,
+      printTimeMinutes: result.printTimeMinutes ?? 0,
+      filamentUsageGrams: result.filamentUsageGrams ?? 0,
+      filaments: result.filamentUsageGrams != null ? [{
+        id: 1,
+        type: result.filamentType || "Unknown",
+        color: "#808080",
+        usedGrams: result.filamentUsageGrams,
+        usedMeters: 0,
+      }] : [],
+    });
+  }
+
   return true;
 }
 
@@ -177,13 +202,28 @@ function tryBambuStudio(
     }
 
     // Also sum filament used_g from <filament> children (more accurate for multi-filament)
+    const plateFilaments: FilamentDetail[] = [];
     if (plate.filament) {
       const filaments = Array.isArray(plate.filament) ? plate.filament : [plate.filament];
-      const filamentWeight = filaments.reduce(
-        (sum: number, f: any) => sum + parseFloat(f["@_used_g"] || "0"),
-        0
-      );
+      let filamentWeight = 0;
+      for (const f of filaments) {
+        const usedG = parseFloat(f["@_used_g"] || "0");
+        const usedM = parseFloat(f["@_used_m"] || "0");
+        filamentWeight += usedG;
+        plateFilaments.push({
+          id: parseInt(f["@_id"] || "0", 10),
+          type: f["@_type"] || "Unknown",
+          color: f["@_color"] || "#808080",
+          usedGrams: Math.round(usedG * 100) / 100,
+          usedMeters: Math.round(usedM * 100) / 100,
+        });
+      }
       if (filamentWeight > 0) weight = filamentWeight;
+
+      // Set filament type from first filament
+      if (!result.filamentType && plateFilaments.length > 0) {
+        result.filamentType = plateFilaments[0].type;
+      }
     }
 
     const plateMinutes = prediction / 60;
@@ -194,6 +234,7 @@ function tryBambuStudio(
       index: i + 1,
       printTimeMinutes: Math.round(plateMinutes * 100) / 100,
       filamentUsageGrams: Math.round(weight * 100) / 100,
+      filaments: plateFilaments,
     });
   }
 

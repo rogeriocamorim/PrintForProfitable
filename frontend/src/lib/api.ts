@@ -32,7 +32,7 @@ export async function api<T = unknown>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, body.message ?? res.statusText, body)
+    throw new ApiError(res.status, body.error ?? body.message ?? res.statusText, body)
   }
 
   if (res.status === 204) return undefined as T
@@ -69,7 +69,7 @@ export async function apiFormData<T = unknown>(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.message ?? res.statusText, data)
+    throw new ApiError(res.status, data.error ?? data.message ?? res.statusText, data)
   }
 
   return res.json() as Promise<T>

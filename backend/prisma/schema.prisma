@@ -42,6 +42,7 @@ model Farm {
   electricityRate      Float    @default(0.12)
   laborRate            Float    @default(60)
   prepTimeMinutes      Float    @default(10)
+  maintenanceRate      Float    @default(0.15)
   targetProfitMargin   Float    @default(50)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -70,14 +71,16 @@ model TaxRate {
 }
 
 model Printer {
-  id               String   @id @default(cuid())
-  farmId           String
-  brand            String
-  model            String
-  powerConsumption Float    @default(200)
-  imageUrl         String?
-  preselected      Boolean  @default(false)
-  createdAt        DateTime @default(now())
+  id                    String   @id @default(cuid())
+  farmId                String
+  brand                 String
+  model                 String
+  powerConsumption      Float    @default(200)
+  purchasePrice         Float    @default(0)
+  expectedLifetimeHours Float    @default(5000)
+  imageUrl              String?
+  preselected           Boolean  @default(false)
+  createdAt             DateTime @default(now())
 
   farm   Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
   models Model3D[]

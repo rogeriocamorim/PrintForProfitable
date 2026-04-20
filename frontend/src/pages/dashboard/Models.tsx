@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../../lib/api'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/Table'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
@@ -9,7 +8,8 @@ import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   Plus, Trash2, Eye, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle,
-  Image as ImageIcon, Store, ArrowLeft, ChevronDown, ChevronUp, Info,
+  Image as ImageIcon, ArrowLeft, ChevronDown, ChevronUp, Info,
+  Search, SlidersHorizontal, MoreVertical, Clock, Edit,
 } from 'lucide-react'
 
 // ─── Interfaces ──────────────────────────────────────
@@ -108,6 +108,18 @@ interface PricingBreakdown {
   platformPricing: PlatformPricing[]
 }
 
+interface PricingSummary {
+  totalCost: number
+  avgSellingPrice: number
+  avgProfit: number
+  avgProfitPerHour: number
+  avgProfitMargin: number
+  shippingCost: number
+  machineryCost: number
+  maintenanceCost: number
+  platformPricing: PlatformPricing[]
+}
+
 interface Model3D {
   id: string
   name: string
@@ -134,6 +146,8 @@ interface Model3D {
   suggestedPrice: number
   filament: Filament | null
   printer: Printer | null
+  skus: ModelSku[]
+  pricingSummary: PricingSummary
   createdAt: string
 }
 
@@ -154,6 +168,21 @@ interface ModelDetail extends Model3D {
   }
 }
 
+interface ParsedFilamentDetail {
+  id: number
+  type: string
+  color: string
+  usedGrams: number
+  usedMeters: number
+}
+
+interface ParsedPlateInfo {
+  index: number
+  printTimeMinutes: number
+  filamentUsageGrams: number
+  filaments: ParsedFilamentDetail[]
+}
+
 interface ParseResult {
   fileName: string
   name: string
@@ -163,6 +192,7 @@ interface ParseResult {
   slicer: string | null
   thumbnailUrl: string | null
   storedFileName: string
+  plates: ParsedPlateInfo[]
   parseError?: string
 }
 
@@ -200,6 +230,13 @@ export default function Models() {
   const [showAdd, setShowAdd] = useState(false)
   const [detail, setDetail] = useState<ModelDetail | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // List view state
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('name-asc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [mode, setMode] = useState<'manual' | 'upload'>('upload')
   const [uploading, setUploading] = useState(false)
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
@@ -319,7 +356,9 @@ export default function Models() {
           }),
         })
       }
-      setModels([model, ...models])
+      // Refetch full list to get pricingSummary
+      const refreshed = await api<Model3D[]>('/models')
+      setModels(refreshed)
       setShowAdd(false)
       resetForm()
     } catch { /* error */ } finally { setSaving(false) }
@@ -365,11 +404,11 @@ export default function Models() {
       prepCostPerHour: String(d.prepCostPerHour ?? d.farm?.laborRate ?? 60),
       postTimeMinutes: String(d.postTimeMinutes),
       postCostPerHour: String(d.postCostPerHour ?? d.farm?.laborRate ?? 60),
-      skus: d.skus.length > 0 ? d.skus.map((s) => ({ sku: s.sku })) : [],
-      parts: d.parts.length > 0
+      skus: (d.skus || []).length > 0 ? d.skus.map((s) => ({ sku: s.sku })) : [],
+      parts: (d.parts || []).length > 0
         ? d.parts.map((p) => ({
             name: p.name,
-            filaments: p.filaments.map((f) => ({
+            filaments: (p.filaments || []).map((f) => ({
               name: f.name,
               filamentId: f.filamentId || '',
               grams: String(f.grams),
@@ -381,15 +420,15 @@ export default function Models() {
             filaments: d.filamentUsageGrams > 0
               ? [{
                   name: d.filament ? `${d.filament.material}` : 'Default',
-                  filamentId: d.filamentId || '',
+                  filamentId: d.filamentId || (farmFilaments.length > 0 ? farmFilaments[0].id : ''),
                   grams: String(d.filamentUsageGrams),
                   totalCost: String(d.filament ? (d.filament.costPerSpool / d.filament.spoolWeight * d.filamentUsageGrams).toFixed(2) : '0'),
                 }]
               : [],
           }],
-      supplies: d.supplies.map((s) => ({ name: s.name, cost: String(s.cost) })),
+      supplies: (d.supplies || []).map((s) => ({ name: s.name, cost: String(s.cost) })),
       platformAssignments: d.farm?.salesPlatforms.map((sp) => {
-        const existing = d.platformAssignments.find((a) => a.platformId === sp.id)
+        const existing = (d.platformAssignments || []).find((a) => a.platformId === sp.id)
         return {
           platformId: sp.id,
           shippingProfileId: existing?.shippingProfileId || '',
@@ -494,7 +533,7 @@ export default function Models() {
 
   // Computed costs from edit form
   const computedCosts = useCallback(() => {
-    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, supplies: 0, total: 0 }
+    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0 }
 
     const filamentCost = editForm.parts.reduce((sum, p) =>
       sum + p.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0), 0
@@ -511,16 +550,79 @@ export default function Models() {
     const postCost = ((parseFloat(editForm.postCostPerHour) || 0) / 60) * (parseFloat(editForm.postTimeMinutes) || 0)
     const laborCost = prepCost + postCost
 
+    // Machinery cost: (purchasePrice / expectedLifetimeHours) * printHours
+    const purchasePrice = (selectedPrinter as any)?.purchasePrice ?? 0
+    const lifetimeHours = (selectedPrinter as any)?.expectedLifetimeHours ?? 5000
+    const machineryCost = lifetimeHours > 0 ? (purchasePrice / lifetimeHours) * printHours : 0
+
+    // Maintenance cost: maintenanceRate * printHours
+    const maintenanceRate = (detail.farm as any)?.maintenanceRate ?? 0.15
+    const maintenanceCost = maintenanceRate * printHours
+
     const suppliesCost = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
 
     return {
       filament: filamentCost,
       print: printCost,
       labor: laborCost,
+      machinery: machineryCost,
+      maintenance: maintenanceCost,
       supplies: suppliesCost,
-      total: filamentCost + printCost + laborCost + suppliesCost,
+      total: filamentCost + printCost + laborCost + machineryCost + maintenanceCost + suppliesCost,
     }
   }, [editForm, detail, printers])
+
+  // ─── Filtered, sorted, paginated models ────────────
+  const filteredModels = models.filter((m) => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    const skuMatch = m.skus?.some((s) => s.sku.toLowerCase().includes(q))
+    return m.name.toLowerCase().includes(q) || skuMatch
+  })
+
+  const sortedModels = [...filteredModels].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc': return a.name.localeCompare(b.name)
+      case 'name-desc': return b.name.localeCompare(a.name)
+      case 'cost-asc': return (a.pricingSummary?.totalCost ?? 0) - (b.pricingSummary?.totalCost ?? 0)
+      case 'cost-desc': return (b.pricingSummary?.totalCost ?? 0) - (a.pricingSummary?.totalCost ?? 0)
+      case 'date-desc': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case 'date-asc': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      default: return 0
+    }
+  })
+
+  const totalPages = Math.max(1, Math.ceil(sortedModels.length / pageSize))
+  const paginatedModels = sortedModels.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  // Stats
+  const stats = {
+    totalModels: models.length,
+    avgListPrice: models.length > 0 ? models.reduce((s, m) => s + (m.pricingSummary?.avgSellingPrice ?? 0), 0) / models.length : 0,
+    avgProfit: models.length > 0 ? models.reduce((s, m) => s + (m.pricingSummary?.avgProfit ?? 0), 0) / models.length : 0,
+    avgProfitPerHour: models.length > 0 ? models.reduce((s, m) => s + (m.pricingSummary?.avgProfitPerHour ?? 0), 0) / models.length : 0,
+    avgGrossMargin: models.length > 0 ? models.reduce((s, m) => s + (m.pricingSummary?.avgProfitMargin ?? 0), 0) / models.length : 0,
+  }
+
+  function toggleRow(id: string) {
+    setExpandedRows((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function getPlatformBadge(type: string) {
+    const badges: Record<string, { bg: string; text: string; label: string }> = {
+      etsy: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'ETSY' },
+      amazon: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'AMAZON' },
+      shopify: { bg: 'bg-green-100', text: 'text-green-700', label: 'SHOPIFY' },
+      ebay: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'EBAY' },
+      tiktok: { bg: 'bg-pink-100', text: 'text-pink-700', label: 'TIKTOK' },
+      custom: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'CUSTOM' },
+    }
+    return badges[type.toLowerCase()] || badges.custom
+  }
 
   const selectClasses = "flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
 
@@ -1075,21 +1177,29 @@ export default function Models() {
         {/* COST SUMMARY */}
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6">
           <h2 className="text-sm font-bold text-foreground uppercase tracking-wide mb-4">Cost Summary</h2>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
             <div>
-              <p className="text-xs font-semibold text-muted uppercase">Filament Cost</p>
+              <p className="text-xs font-semibold text-muted uppercase">Filament</p>
               <p className="text-lg font-bold text-foreground">${costs.filament.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted uppercase">Print Cost</p>
+              <p className="text-xs font-semibold text-muted uppercase">Print</p>
               <p className="text-lg font-bold text-foreground">${costs.print.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted uppercase">Labor Cost</p>
+              <p className="text-xs font-semibold text-muted uppercase">Labor</p>
               <p className="text-lg font-bold text-foreground">${costs.labor.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted uppercase">Supplies Cost</p>
+              <p className="text-xs font-semibold text-muted uppercase">Machinery</p>
+              <p className="text-lg font-bold text-foreground">${costs.machinery.toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase">Maintenance</p>
+              <p className="text-lg font-bold text-foreground">${costs.maintenance.toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase">Supplies</p>
               <p className="text-lg font-bold text-foreground">${costs.supplies.toFixed(2)}</p>
             </div>
             <div>
@@ -1119,11 +1229,29 @@ export default function Models() {
   // ─── MODEL LIST VIEW ──────────────────────────────
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">3D Models</h1>
-          <p className="text-sm text-muted mt-1">{models.length} model{models.length !== 1 ? 's' : ''}</p>
-        </div>
+      {/* Header */}
+      <h1 className="text-xl font-bold text-foreground uppercase tracking-wide">3D Models</h1>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: 'TOTAL MODELS', value: String(stats.totalModels) },
+          { label: 'AVG LIST PRICE', value: `$${stats.avgListPrice.toFixed(2)}` },
+          { label: 'AVG PROFIT / PRINT', value: `$${stats.avgProfit.toFixed(2)}` },
+          { label: 'AVG PROFIT / HOUR', value: `$${stats.avgProfitPerHour.toFixed(2)}` },
+          { label: 'AVG GROSS MARGIN', value: `${stats.avgGrossMargin.toFixed(1)}%` },
+        ].map((s) => (
+          <Card key={s.label}>
+            <CardContent className="py-4 px-5">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider">{s.label}</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{s.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Add Model Button */}
+      <div className="flex justify-end">
         <Button onClick={() => { resetForm(); setShowAdd(true) }}>
           <Plus className="h-4 w-4" /> Add Model
         </Button>
@@ -1141,70 +1269,235 @@ export default function Models() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <tr>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Print Time</TableHead>
-                <TableHead>Filament</TableHead>
-                <TableHead>Material</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </tr>
-            </TableHeader>
-            <TableBody>
-              {models.map((model) => (
-                <TableRow key={model.id}>
-                  <TableCell className="pr-0">
-                    {model.thumbnailUrl ? (
-                      <img src={model.thumbnailUrl} alt={model.name} className="h-10 w-10 rounded-md object-cover border border-border" />
+        <>
+          {/* Search / Sort / Filter Bar */}
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted whitespace-nowrap">Showing {paginatedModels.length} of {filteredModels.length} models</p>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search name or SKU..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                  className="h-9 w-64 rounded-lg border border-border bg-white pl-9 pr-3 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+              >
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="cost-desc">Cost (High-Low)</option>
+                <option value="cost-asc">Cost (Low-High)</option>
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Model Rows */}
+          <div className="space-y-2">
+            {paginatedModels.map((model) => {
+              const isExpanded = expandedRows.has(model.id)
+              const ps = model.pricingSummary
+              const printHrs = model.printTimeMinutes / 60
+
+              return (
+                <div key={model.id} className="rounded-xl border border-border bg-white shadow-xs overflow-hidden">
+                  {/* Main Row */}
+                  <div
+                    className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-surface-raised/50 transition-colors"
+                    onClick={() => toggleRow(model.id)}
+                  >
+                    {/* Checkbox */}
+                    <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20" onClick={(e) => e.stopPropagation()} />
+
+                    {/* Thumbnail */}
+                    {model.thumbnailUrl || model.imagePath ? (
+                      <img
+                        src={model.imagePath ? `/api/uploads/images/${model.imagePath}` : model.thumbnailUrl!}
+                        alt={model.name}
+                        className="h-16 w-16 rounded-lg object-cover border border-border-light shrink-0"
+                      />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-raised border border-border-light">
-                        <ImageIcon className="h-5 w-5 text-muted" />
+                      <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-raised border border-border-light shrink-0">
+                        <ImageIcon className="h-6 w-6 text-muted" />
                       </div>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-foreground">{model.name}</p>
-                      <p className="text-xs text-muted">{formatTime(model.printTimeMinutes)} &middot; {model.filamentUsageGrams}g</p>
+
+                    {/* Name + time */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground truncate">{model.name}</p>
+                      <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(model.printTimeMinutes)}
+                      </p>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {model.slicer ? (
-                      <Badge variant="info">{model.slicer}</Badge>
-                    ) : model.originalFileName ? (
-                      <Badge variant="default">Upload</Badge>
-                    ) : (
-                      <span className="text-muted text-xs">Manual</span>
+
+                    {/* Filament indicator */}
+                    {model.filament && (
+                      <div className="h-4 w-4 rounded-full bg-green-500 shrink-0" title={model.filament.material} />
                     )}
-                  </TableCell>
-                  <TableCell>{formatTime(model.printTimeMinutes)}</TableCell>
-                  <TableCell>{model.filamentUsageGrams}g</TableCell>
-                  <TableCell>
-                    {model.filament ? (
-                      <Badge variant="info">{model.filament.material}</Badge>
-                    ) : (
-                      <span className="text-muted">--</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEditModel(model.id)} className="rounded p-1.5 text-muted hover:bg-surface-raised hover:text-foreground transition-colors" title="Edit model">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleDelete(model.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+
+                    {/* Pricing columns */}
+                    <div className="flex items-center gap-6 shrink-0">
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-muted uppercase">COGS</p>
+                        <p className="text-sm font-bold text-foreground">${ps?.totalCost?.toFixed(2) ?? '0.00'}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-muted uppercase">Avg. PPP</p>
+                        <p className="text-sm font-bold text-foreground">${ps?.avgProfit?.toFixed(2) ?? '0.00'}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-muted uppercase">Avg. PPH</p>
+                        <p className="text-sm font-bold text-foreground">${ps?.avgProfitPerHour?.toFixed(2) ?? '0.00'}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-semibold text-muted uppercase">Avg. GPM</p>
+                        <p className="text-sm font-bold text-foreground">{ps?.avgProfitMargin?.toFixed(1) ?? '0.0'}%</p>
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+
+                    {/* Expand / actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isExpanded ? <ChevronUp className="h-5 w-5 text-muted" /> : <ChevronDown className="h-5 w-5 text-muted" />}
+                      <div className="relative" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="rounded p-1.5 text-muted hover:bg-surface-raised hover:text-foreground transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const menu = (e.currentTarget.nextElementSibling as HTMLElement)
+                            menu.classList.toggle('hidden')
+                          }}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                        <div className="hidden absolute right-0 top-8 z-10 w-36 rounded-lg border border-border bg-white shadow-dropdown py-1">
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-raised transition-colors"
+                            onClick={() => openEditModel(model.id)}
+                          >
+                            <Edit className="h-3.5 w-3.5" /> Edit
+                          </button>
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            onClick={() => handleDelete(model.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded: Per-platform pricing */}
+                  {isExpanded && ps?.platformPricing && ps.platformPricing.length > 0 && (
+                    <div className="border-t border-border bg-surface-raised/30 px-4 py-3">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+                              <th className="text-left py-2 pr-4 w-36">Platform</th>
+                              <th className="text-left py-2 px-3">Sale Price</th>
+                              <th className="text-left py-2 px-3">COGS</th>
+                              <th className="text-left py-2 px-3">Plat. Fees</th>
+                              <th className="text-left py-2 px-3">Shipping</th>
+                              <th className="text-left py-2 px-3">Profit Per Print</th>
+                              <th className="text-left py-2 px-3">Profit Per Hour</th>
+                              <th className="text-left py-2 px-3">Gross Profit Margin</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ps.platformPricing.map((pp) => {
+                              const badge = getPlatformBadge(pp.platformType)
+                              const pph = printHrs > 0 ? pp.profit / printHrs : 0
+                              return (
+                                <tr key={pp.platformId} className="border-t border-border-light">
+                                  <td className="py-3 pr-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${badge.bg} ${badge.text}`}>
+                                        {badge.label}
+                                      </span>
+                                      <span className="text-sm text-foreground">{pp.shopName}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 font-semibold text-foreground">${pp.sellingPrice.toFixed(2)}</td>
+                                  <td className="py-3 px-3 text-foreground">${ps.totalCost.toFixed(2)}</td>
+                                  <td className="py-3 px-3 text-red-600">${pp.platformFees.toFixed(2)}</td>
+                                  <td className="py-3 px-3 text-foreground">${ps.shippingCost.toFixed(2)}</td>
+                                  <td className="py-3 px-3 font-semibold text-green-600">${pp.profit.toFixed(2)}</td>
+                                  <td className="py-3 px-3 font-semibold text-green-600">${pph.toFixed(2)}</td>
+                                  <td className="py-3 px-3 font-semibold text-green-600">{pp.profitMargin.toFixed(1)}%</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {isExpanded && (!ps?.platformPricing || ps.platformPricing.length === 0) && (
+                    <div className="border-t border-border bg-surface-raised/30 px-4 py-4 text-center text-sm text-muted">
+                      No sales platforms configured. Add platforms in <button onClick={() => openEditModel(model.id)} className="text-primary hover:underline">Edit Model</button> or <a href="/dashboard/marketplaces" className="text-primary hover:underline">Marketplaces</a>.
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted">Page {currentPage} of {totalPages}</p>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="rounded px-2 py-1 text-sm text-muted hover:bg-surface-raised disabled:opacity-30 disabled:pointer-events-none"
+              >&laquo;</button>
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="rounded px-2 py-1 text-sm text-muted hover:bg-surface-raised disabled:opacity-30 disabled:pointer-events-none"
+              >&lsaquo;</button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4))
+                const page = start + i
+                if (page > totalPages) return null
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`rounded px-3 py-1 text-sm font-medium transition-colors ${page === currentPage ? 'border border-primary text-primary bg-white' : 'text-muted hover:bg-surface-raised'}`}
+                  >{page}</button>
+                )
+              })}
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="rounded px-2 py-1 text-sm text-muted hover:bg-surface-raised disabled:opacity-30 disabled:pointer-events-none"
+              >&rsaquo;</button>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="rounded px-2 py-1 text-sm text-muted hover:bg-surface-raised disabled:opacity-30 disabled:pointer-events-none"
+              >&raquo;</button>
+            </div>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
+              className="h-8 rounded-lg border border-border bg-white px-2 text-sm shadow-xs"
+            >
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} / page</option>)}
+            </select>
+          </div>
+        </>
       )}
 
       {/* Add Model Modal */}

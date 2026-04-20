@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "farms" ADD COLUMN     "maintenanceRate" DOUBLE PRECISION NOT NULL DEFAULT 0.15;
+
+-- AlterTable
+ALTER TABLE "printers" ADD COLUMN     "expectedLifetimeHours" DOUBLE PRECISION NOT NULL DEFAULT 5000,
+ADD COLUMN     "purchasePrice" DOUBLE PRECISION NOT NULL DEFAULT 0;
