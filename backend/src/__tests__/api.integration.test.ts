@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import app from '../index';
-import prisma from '../services/prisma';
+import app from '../index.js';
+import prisma from '../services/prisma.js';
 
 // Unique test user to avoid conflicts
 const TEST_EMAIL = `test-${Date.now()}@integration.test`;

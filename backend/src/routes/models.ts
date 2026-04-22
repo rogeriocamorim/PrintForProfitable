@@ -2,9 +2,13 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
-import { parseThreeMF } from "../services/threemf-parser";
+import { fileURLToPath } from "url";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
+import { parseThreeMF } from "../services/threemf-parser.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 router.use(isAuthenticated);
@@ -78,20 +82,24 @@ function computePlatformPricing(
     .filter((p) => p.enabled)
     .map((p) => {
       const fees = p.feesConfig || {};
-      const percentage = parseFloat(fees.percentage || "0") / 100;
-      const flat = parseFloat(fees.flat || "0");
+      // Use pre-computed totals, or fall back to granular fee fields
+      const percentage = parseFloat(fees.percentage || "0") ||
+        ((parseFloat(fees.transactionPct || "0") + parseFloat(fees.processingPct || "0")));
+      const flat = parseFloat(fees.flat || "0") ||
+        ((parseFloat(fees.processingFlat || "0") + parseFloat(fees.listingFee || "0")));
+      const pctFraction = percentage / 100;
 
       // Total cost includes shipping cost; shipping revenue offsets the selling price needed
-      // sellingPrice = (totalCost + shippingCost - shippingRevenue + flat) / (1 - percentage - margin/100)
+      // sellingPrice = (totalCost + shippingCost - shippingRevenue + flat) / (1 - pctFraction - margin/100)
       const marginFraction = targetMargin / 100;
-      const denominator = 1 - percentage - marginFraction;
+      const denominator = 1 - pctFraction - marginFraction;
       const netShippingCost = shippingCost - shippingRevenue; // negative if customer overpays shipping
       let sellingPrice: number;
 
       if (denominator > 0) {
         sellingPrice = (totalCostBeforeFees + netShippingCost + flat) / denominator;
       } else {
-        sellingPrice = (totalCostBeforeFees + netShippingCost) * (1 + marginFraction) + flat + totalCostBeforeFees * percentage;
+        sellingPrice = (totalCostBeforeFees + netShippingCost) * (1 + marginFraction) + flat + totalCostBeforeFees * pctFraction;
       }
 
       // Ensure selling price is at least the cost
@@ -99,7 +107,7 @@ function computePlatformPricing(
         sellingPrice = totalCostBeforeFees + netShippingCost;
       }
 
-      const platformFees = sellingPrice * percentage + flat;
+      const platformFees = sellingPrice * pctFraction + flat;
       const profit = sellingPrice - totalCostBeforeFees - netShippingCost - platformFees;
 
       return {
@@ -437,7 +445,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
 
     const model = await prisma.model3D.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
       include: {
         filament: true,
         printer: true,
@@ -576,7 +584,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     }
 
     const existing = await prisma.model3D.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
 
     if (!existing) {
@@ -611,7 +619,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Update model scalar fields
     const updated = await prisma.model3D.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(name !== undefined && { name }),
         ...(printTimeMinutes !== undefined && { printTimeMinutes }),
@@ -635,11 +643,11 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Update SKUs (replace all)
     if (skus !== undefined) {
-      await prisma.modelSku.deleteMany({ where: { modelId: req.params.id } });
+      await prisma.modelSku.deleteMany({ where: { modelId: req.params.id as string } });
       if (skus.length > 0) {
         await prisma.modelSku.createMany({
           data: skus.map((s: { sku: string }) => ({
-            modelId: req.params.id,
+            modelId: req.params.id as string,
             sku: s.sku,
           })),
         });
@@ -649,12 +657,12 @@ router.put("/:id", async (req: Request, res: Response) => {
     // Update Parts & Filaments (replace all)
     if (parts !== undefined) {
       // Delete existing parts (cascades to filaments)
-      await prisma.modelPart.deleteMany({ where: { modelId: req.params.id } });
+      await prisma.modelPart.deleteMany({ where: { modelId: req.params.id as string } });
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i];
         const createdPart = await prisma.modelPart.create({
           data: {
-            modelId: req.params.id,
+            modelId: req.params.id as string,
             name: p.name || `Plate ${i + 1}`,
             sortOrder: i,
           },
@@ -675,11 +683,11 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Update Supplies (replace all)
     if (supplies !== undefined) {
-      await prisma.modelSupply.deleteMany({ where: { modelId: req.params.id } });
+      await prisma.modelSupply.deleteMany({ where: { modelId: req.params.id as string } });
       if (supplies.length > 0) {
         await prisma.modelSupply.createMany({
           data: supplies.map((s: { name: string; cost: number }) => ({
-            modelId: req.params.id,
+            modelId: req.params.id as string,
             name: s.name,
             cost: s.cost,
           })),
@@ -689,11 +697,11 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Update Platform Assignments (replace all)
     if (platformAssignments !== undefined) {
-      await prisma.modelPlatformAssignment.deleteMany({ where: { modelId: req.params.id } });
+      await prisma.modelPlatformAssignment.deleteMany({ where: { modelId: req.params.id as string } });
       if (platformAssignments.length > 0) {
         await prisma.modelPlatformAssignment.createMany({
           data: platformAssignments.map((a: any) => ({
-            modelId: req.params.id,
+            modelId: req.params.id as string,
             platformId: a.platformId,
             shippingProfileId: a.shippingProfileId || null,
             enabled: a.enabled !== false,
@@ -704,7 +712,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Return full model with all relations
     const fullModel = await prisma.model3D.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         filament: true,
         printer: true,
@@ -755,7 +763,7 @@ router.post("/:id/image", imageUpload.single("image"), async (req: Request, res:
       return;
     }
     const model = await prisma.model3D.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { imagePath: req.file.filename },
     });
     res.json({ imagePath: model.imagePath, imageUrl: `/api/uploads/images/${model.imagePath}` });
@@ -775,7 +783,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
     }
 
     const existing = await prisma.model3D.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
 
     if (!existing) {
@@ -783,7 +791,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    await prisma.model3D.delete({ where: { id: req.params.id } });
+    await prisma.model3D.delete({ where: { id: req.params.id as string } });
     res.json({ message: "Model deleted" });
   } catch (err) {
     console.error("Delete model error:", err);

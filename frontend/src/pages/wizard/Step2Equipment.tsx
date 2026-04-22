@@ -11,6 +11,8 @@ interface Printer {
   brand: string
   model: string
   powerConsumption: string
+  purchasePrice: string
+  expectedLifetimeHours: string
 }
 
 interface Filament {
@@ -35,7 +37,7 @@ export default function Step2Equipment() {
   const [error, setError] = useState('')
 
   const addPrinter = () => {
-    setPrinters([...printers, { id: Date.now().toString(), brand: '', model: '', powerConsumption: '' }])
+    setPrinters([...printers, { id: Date.now().toString(), brand: '', model: '', powerConsumption: '', purchasePrice: '', expectedLifetimeHours: '5000' }])
   }
 
   const removePrinter = (id: string) => setPrinters(printers.filter((p) => p.id !== id))
@@ -69,6 +71,8 @@ export default function Step2Equipment() {
             brand: p.brand,
             model: p.model,
             powerConsumption: parseFloat(p.powerConsumption) || 200,
+            purchasePrice: parseFloat(p.purchasePrice) || 0,
+            expectedLifetimeHours: parseFloat(p.expectedLifetimeHours) || 5000,
           })),
           filaments: filaments.map((f) => ({
             brand: f.brand,
@@ -139,6 +143,25 @@ export default function Step2Equipment() {
                         value={p.powerConsumption}
                         onChange={(e) => updatePrinter(p.id, 'powerConsumption', e.target.value)}
                       />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Purchase Price"
+                          type="number"
+                          step="0.01"
+                          prefix="$"
+                          placeholder="299"
+                          value={p.purchasePrice}
+                          onChange={(e) => updatePrinter(p.id, 'purchasePrice', e.target.value)}
+                        />
+                        <Input
+                          label="Expected Lifetime"
+                          type="number"
+                          suffix="hours"
+                          placeholder="5000"
+                          value={p.expectedLifetimeHours}
+                          onChange={(e) => updatePrinter(p.id, 'expectedLifetimeHours', e.target.value)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

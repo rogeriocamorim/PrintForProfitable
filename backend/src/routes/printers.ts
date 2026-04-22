@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
+import { recalcModelsForPrinter } from "../services/recalc.js";
 
 const router = Router();
 router.use(isAuthenticated);
@@ -68,13 +69,13 @@ router.put("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.printer.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Printer not found" }); return; }
 
     const { brand, model, powerConsumption, imageUrl, purchasePrice, expectedLifetimeHours } = req.body;
     const updated = await prisma.printer.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(brand !== undefined && { brand }),
         ...(model !== undefined && { model }),
@@ -84,6 +85,12 @@ router.put("/:id", async (req: Request, res: Response) => {
         ...(expectedLifetimeHours !== undefined && { expectedLifetimeHours }),
       },
     });
+
+    // Recalculate all models using this printer
+    if (powerConsumption !== undefined || purchasePrice !== undefined || expectedLifetimeHours !== undefined) {
+      await recalcModelsForPrinter(updated.id);
+    }
+
     res.json(updated);
   } catch (err) {
     console.error("Update printer error:", err);
@@ -98,11 +105,11 @@ router.delete("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.printer.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Printer not found" }); return; }
 
-    await prisma.printer.delete({ where: { id: req.params.id } });
+    await prisma.printer.delete({ where: { id: req.params.id as string } });
     res.status(204).send();
   } catch (err) {
     console.error("Delete printer error:", err);

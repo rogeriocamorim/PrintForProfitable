@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import passport from "../services/passport";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import passport from "../services/passport.js";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";

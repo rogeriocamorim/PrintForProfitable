@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
+    "target": "ES2022",
+    "module": "nodenext",
+    "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,7 +13,7 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*"],

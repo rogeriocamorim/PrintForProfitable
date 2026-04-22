@@ -27,6 +27,8 @@ interface Printer {
   brand: string
   model: string
   powerConsumption: number
+  purchasePrice: number
+  expectedLifetimeHours: number
 }
 
 interface SalesPlatform {
@@ -230,6 +232,7 @@ export default function Models() {
   const [showAdd, setShowAdd] = useState(false)
   const [detail, setDetail] = useState<ModelDetail | null>(null)
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // List view state
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -514,15 +517,17 @@ export default function Models() {
         }),
       })
 
-      // Reload model detail and list
-      const [updatedDetail, updatedModels] = await Promise.all([
-        api<ModelDetail>(`/models/${detail.id}`),
-        api<Model3D[]>('/models'),
-      ])
-      setDetail(updatedDetail)
-      initEditForm(updatedDetail)
+      // Reload list and close detail
+      const updatedModels = await api<Model3D[]>('/models')
       setModels(updatedModels)
-    } catch { /* error */ } finally { setSaving(false) }
+      setDetail(null)
+      setEditForm(null)
+      setToast({ type: 'success', message: 'Model saved successfully' })
+      setTimeout(() => setToast(null), 3000)
+    } catch {
+      setToast({ type: 'error', message: 'Failed to save model' })
+      setTimeout(() => setToast(null), 4000)
+    } finally { setSaving(false) }
   }
 
   function formatTime(minutes: number) {
@@ -531,9 +536,9 @@ export default function Models() {
     return h > 0 ? `${h}h ${m}m` : `${m}m`
   }
 
-  // Computed costs from edit form
+  // Computed costs from edit form (with breakdown details)
   const computedCosts = useCallback(() => {
-    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0 }
+    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0, breakdown: null as any }
 
     const filamentCost = editForm.parts.reduce((sum, p) =>
       sum + p.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0), 0
@@ -541,18 +546,22 @@ export default function Models() {
 
     const printHours = ((parseInt(editForm.printHours) || 0) * 60 + (parseInt(editForm.printMinutes) || 0)) / 60
     const allPrinters = detail.farm?.printers || printers
-    const selectedPrinter = allPrinters.find((p) => p.id === editForm.printerId)
-    const watts = selectedPrinter?.powerConsumption ?? allPrinters[0]?.powerConsumption ?? 200
+    const selectedPrinter = allPrinters.find((p) => p.id === editForm.printerId) ?? allPrinters[0] ?? null
+    const watts = selectedPrinter?.powerConsumption ?? 200
     const electricityRate = detail.farm?.electricityRate ?? 0.12
     const printCost = (electricityRate * watts / 1000) * printHours
 
-    const prepCost = ((parseFloat(editForm.prepCostPerHour) || 0) / 60) * (parseFloat(editForm.prepTimeMinutes) || 0)
-    const postCost = ((parseFloat(editForm.postCostPerHour) || 0) / 60) * (parseFloat(editForm.postTimeMinutes) || 0)
+    const prepRate = parseFloat(editForm.prepCostPerHour) || 0
+    const postRate = parseFloat(editForm.postCostPerHour) || 0
+    const prepMins = parseFloat(editForm.prepTimeMinutes) || 0
+    const postMins = parseFloat(editForm.postTimeMinutes) || 0
+    const prepCost = (prepRate / 60) * prepMins
+    const postCost = (postRate / 60) * postMins
     const laborCost = prepCost + postCost
 
     // Machinery cost: (purchasePrice / expectedLifetimeHours) * printHours
-    const purchasePrice = (selectedPrinter as any)?.purchasePrice ?? 0
-    const lifetimeHours = (selectedPrinter as any)?.expectedLifetimeHours ?? 5000
+    const purchasePrice = selectedPrinter?.purchasePrice ?? 0
+    const lifetimeHours = selectedPrinter?.expectedLifetimeHours ?? 5000
     const machineryCost = lifetimeHours > 0 ? (purchasePrice / lifetimeHours) * printHours : 0
 
     // Maintenance cost: maintenanceRate * printHours
@@ -569,6 +578,20 @@ export default function Models() {
       maintenance: maintenanceCost,
       supplies: suppliesCost,
       total: filamentCost + printCost + laborCost + machineryCost + maintenanceCost + suppliesCost,
+      breakdown: {
+        printHours,
+        watts,
+        electricityRate,
+        prepRate,
+        postRate,
+        prepMins,
+        postMins,
+        prepCost,
+        postCost,
+        purchasePrice,
+        lifetimeHours,
+        maintenanceRate,
+      },
     }
   }, [editForm, detail, printers])
 
@@ -863,7 +886,12 @@ export default function Models() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-primary uppercase tracking-wide">Parts & Filaments</h2>
-              <span className="text-sm font-semibold text-primary">Total: ${costs.filament.toFixed(2)}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted">
+                  {editForm.parts.reduce((sum, p) => sum + p.filaments.reduce((s, f) => s + (parseFloat(f.grams) || 0), 0), 0).toFixed(1)}g total
+                </span>
+                <span className="text-sm font-semibold text-primary">Total: ${costs.filament.toFixed(2)}</span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -935,19 +963,9 @@ export default function Models() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-muted mb-1">Total</label>
-                          <div className="flex items-center h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-xs">
+                          <div className="flex items-center h-9 rounded-lg border border-border bg-surface-raised px-3 text-sm shadow-xs">
                             <span className="text-muted mr-1">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-full bg-transparent focus:outline-none"
-                              value={fil.totalCost}
-                              onChange={(e) => {
-                                const newParts = [...editForm.parts]
-                                newParts[pIdx].filaments[fIdx] = { ...fil, totalCost: e.target.value }
-                                setEditForm({ ...editForm, parts: newParts })
-                              }}
-                            />
+                            <span className="text-foreground">{fil.totalCost}</span>
                           </div>
                         </div>
                         <button
@@ -1121,7 +1139,7 @@ export default function Models() {
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-primary uppercase tracking-wide">Sales Platforms</h2>
-            <p className="text-xs text-muted mt-1">Select which platforms this model will be sold on. You'll configure pricing later.</p>
+            <p className="text-xs text-muted mt-1">Select which platforms this model will be sold on. Pricing is computed automatically based on costs, fees, and margin.</p>
           </CardHeader>
           <CardContent>
             {farmPlatforms.length === 0 ? (
@@ -1131,39 +1149,112 @@ export default function Models() {
                 {editForm.platformAssignments.map((assignment, aIdx) => {
                   const platform = farmPlatforms.find((p) => p.id === assignment.platformId)
                   if (!platform) return null
+
+                  // Compute per-platform pricing when enabled
+                  let platformCalc: { sellingPrice: number; platformFees: number; profit: number; profitMargin: number; formula: string } | null = null
+                  if (assignment.enabled) {
+                    const fees = platform.feesConfig || {}
+                    // Use pre-computed totals or fall back to granular fee fields
+                    const totalPct = parseFloat(fees.percentage || '0') ||
+                      ((parseFloat(fees.transactionPct || '0') + parseFloat(fees.processingPct || '0')))
+                    const totalFlat = parseFloat(fees.flat || '0') ||
+                      ((parseFloat(fees.processingFlat || '0') + parseFloat(fees.listingFee || '0')))
+                    const pctFee = totalPct / 100
+                    const targetMargin = (detail.farm as any)?.targetProfitMargin ?? 50
+                    const marginFraction = targetMargin / 100
+                    const shippingProfile = farmShipping.find((sp) => sp.id === assignment.shippingProfileId)
+                    const shippingCost = shippingProfile?.postageCost ?? 0
+                    const shippingRevenue = shippingProfile?.customerPays ?? 0
+                    const netShipping = shippingCost - shippingRevenue
+
+                    const denominator = 1 - pctFee - marginFraction
+                    let sellingPrice: number
+                    if (denominator > 0) {
+                      sellingPrice = (costs.total + netShipping + totalFlat) / denominator
+                    } else {
+                      sellingPrice = (costs.total + netShipping) * (1 + marginFraction) + totalFlat + costs.total * pctFee
+                    }
+                    if (sellingPrice < costs.total + netShipping) sellingPrice = costs.total + netShipping
+
+                    const platformFees = sellingPrice * pctFee + totalFlat
+                    const profit = sellingPrice - costs.total - netShipping - platformFees
+
+                    const formula = `($${costs.total.toFixed(2)} COGS${netShipping !== 0 ? ` + $${netShipping.toFixed(2)} net shipping` : ''} + $${totalFlat.toFixed(2)} flat fee) / (1 - ${(pctFee * 100).toFixed(1)}% fee - ${targetMargin}% margin)`
+
+                    platformCalc = {
+                      sellingPrice: +sellingPrice.toFixed(2),
+                      platformFees: +platformFees.toFixed(2),
+                      profit: +profit.toFixed(2),
+                      profitMargin: sellingPrice > 0 ? +(profit / sellingPrice * 100).toFixed(1) : 0,
+                      formula,
+                    }
+                  }
+
                   return (
-                    <div key={aIdx} className="flex items-center gap-4 rounded-lg border border-border p-3">
-                      <label className="flex items-center gap-2 shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={assignment.enabled}
-                          onChange={(e) => {
-                            const newAssignments = [...editForm.platformAssignments]
-                            newAssignments[aIdx] = { ...assignment, enabled: e.target.checked }
-                            setEditForm({ ...editForm, platformAssignments: newAssignments })
-                          }}
-                          className="rounded border-border text-primary focus:ring-ring/20"
-                        />
-                        <span className="text-sm font-medium">{platform.shopName || platform.type}</span>
-                        <span className={`h-2 w-2 rounded-full ${platform.enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
-                      </label>
-                      {assignment.enabled && farmShipping.length > 0 && (
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-muted mb-1">Shipping Profile</label>
-                          <select
-                            className={selectClasses}
-                            value={assignment.shippingProfileId}
+                    <div key={aIdx} className="rounded-lg border border-border overflow-hidden">
+                      <div className="flex items-center gap-4 p-3">
+                        <label className="flex items-center gap-2 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={assignment.enabled}
                             onChange={(e) => {
                               const newAssignments = [...editForm.platformAssignments]
-                              newAssignments[aIdx] = { ...assignment, shippingProfileId: e.target.value }
+                              newAssignments[aIdx] = { ...assignment, enabled: e.target.checked }
                               setEditForm({ ...editForm, platformAssignments: newAssignments })
                             }}
-                          >
-                            <option value="">Select the shipping method for this platform</option>
-                            {farmShipping.map((sp) => (
-                              <option key={sp.id} value={sp.id}>{sp.name} - ${sp.customerPays.toFixed(2)}</option>
-                            ))}
-                          </select>
+                            className="rounded border-border text-primary focus:ring-ring/20"
+                          />
+                          <span className="text-sm font-medium">{platform.shopName || platform.type}</span>
+                          <span className={`h-2 w-2 rounded-full ${platform.enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        </label>
+                        {assignment.enabled && farmShipping.length > 0 && (
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-muted mb-1">Shipping Profile</label>
+                            <select
+                              className={selectClasses}
+                              value={assignment.shippingProfileId}
+                              onChange={(e) => {
+                                const newAssignments = [...editForm.platformAssignments]
+                                newAssignments[aIdx] = { ...assignment, shippingProfileId: e.target.value }
+                                setEditForm({ ...editForm, platformAssignments: newAssignments })
+                              }}
+                            >
+                              <option value="">Select the shipping method for this platform</option>
+                              {farmShipping.map((sp) => (
+                                <option key={sp.id} value={sp.id}>{sp.name} - ${sp.customerPays.toFixed(2)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {assignment.enabled && platformCalc && (
+                          <div className="shrink-0 text-right">
+                            <p className="text-lg font-bold text-primary">${platformCalc.sellingPrice.toFixed(2)}</p>
+                            <p className="text-xs text-muted">selling price</p>
+                          </div>
+                        )}
+                      </div>
+                      {/* Pricing breakdown when enabled */}
+                      {assignment.enabled && platformCalc && (
+                        <div className="border-t border-border bg-surface-raised px-4 py-3">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-muted">Selling Price</p>
+                              <p className="font-semibold text-foreground">${platformCalc.sellingPrice.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted">Platform Fees</p>
+                              <p className="font-semibold text-red-600">-${platformCalc.platformFees.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted">Profit</p>
+                              <p className={`font-semibold ${platformCalc.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>${platformCalc.profit.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted">Margin</p>
+                              <p className={`font-semibold ${platformCalc.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{platformCalc.profitMargin}%</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted mt-2">{platformCalc.formula}</p>
                         </div>
                       )}
                     </div>
@@ -1174,36 +1265,89 @@ export default function Models() {
           </CardContent>
         </Card>
 
-        {/* COST SUMMARY */}
+        {/* COST SUMMARY WITH BREAKDOWN */}
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6">
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wide mb-4">Cost Summary</h2>
-          <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Filament</p>
-              <p className="text-lg font-bold text-foreground">${costs.filament.toFixed(2)}</p>
+          <h2 className="text-sm font-bold text-foreground uppercase tracking-wide mb-4">Cost Breakdown</h2>
+          <div className="space-y-3">
+            {/* Filament */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Filament</p>
+                <p className="text-xs text-muted mt-0.5">
+                  {editForm.parts.flatMap(p => p.filaments).map((f, i) => {
+                    const fil = filaments.find(fl => fl.id === f.filamentId)
+                    const g = parseFloat(f.grams) || 0
+                    const rate = fil ? (fil.costPerSpool / fil.spoolWeight) : 0
+                    return <span key={i} className="block">{f.name || 'Unnamed'}: {g.toFixed(1)}g x ${rate.toFixed(4)}/g = ${(g * rate).toFixed(2)}</span>
+                  })}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.filament.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Print</p>
-              <p className="text-lg font-bold text-foreground">${costs.print.toFixed(2)}</p>
+
+            {/* Electricity */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Electricity</p>
+                <p className="text-xs text-muted mt-0.5">
+                  ${costs.breakdown?.electricityRate.toFixed(2)}/kWh x {costs.breakdown?.watts}W / 1000 x {costs.breakdown?.printHours.toFixed(2)}h
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.print.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Labor</p>
-              <p className="text-lg font-bold text-foreground">${costs.labor.toFixed(2)}</p>
+
+            {/* Labor */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Labor</p>
+                <p className="text-xs text-muted mt-0.5">
+                  Prep: ${costs.breakdown?.prepRate.toFixed(2)}/hr x {costs.breakdown?.prepMins.toFixed(0)}min = ${costs.breakdown?.prepCost.toFixed(2)}
+                  <br />
+                  Post: ${costs.breakdown?.postRate.toFixed(2)}/hr x {costs.breakdown?.postMins.toFixed(0)}min = ${costs.breakdown?.postCost.toFixed(2)}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.labor.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Machinery</p>
-              <p className="text-lg font-bold text-foreground">${costs.machinery.toFixed(2)}</p>
+
+            {/* Machinery */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Machinery</p>
+                <p className="text-xs text-muted mt-0.5">
+                  ${costs.breakdown?.purchasePrice.toFixed(0)} / {costs.breakdown?.lifetimeHours.toFixed(0)}h x {costs.breakdown?.printHours.toFixed(2)}h
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.machinery.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Maintenance</p>
-              <p className="text-lg font-bold text-foreground">${costs.maintenance.toFixed(2)}</p>
+
+            {/* Maintenance */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Maintenance</p>
+                <p className="text-xs text-muted mt-0.5">
+                  ${costs.breakdown?.maintenanceRate.toFixed(2)}/hr x {costs.breakdown?.printHours.toFixed(2)}h
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.maintenance.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Supplies</p>
-              <p className="text-lg font-bold text-foreground">${costs.supplies.toFixed(2)}</p>
+
+            {/* Supplies */}
+            <div className="flex items-start justify-between py-2 border-b border-border/50">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Supplies</p>
+                <p className="text-xs text-muted mt-0.5">
+                  {editForm.supplies.filter(s => s.name.trim()).length > 0
+                    ? editForm.supplies.filter(s => s.name.trim()).map((s, i) => <span key={i} className="block">{s.name}: ${(parseFloat(s.cost) || 0).toFixed(2)}</span>)
+                    : <span>No supplies added</span>
+                  }
+                </p>
+              </div>
+              <p className="text-sm font-bold text-foreground">${costs.supplies.toFixed(2)}</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase">Total COGS</p>
+
+            {/* Total */}
+            <div className="flex items-center justify-between pt-3">
+              <p className="text-sm font-bold text-primary uppercase" title="Cost of Goods Sold">Total COGS</p>
               <p className="text-lg font-bold text-primary">${costs.total.toFixed(2)}</p>
             </div>
           </div>
@@ -1229,6 +1373,17 @@ export default function Models() {
   // ─── MODEL LIST VIEW ──────────────────────────────
   return (
     <div className="space-y-6">
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-elevated text-sm font-medium transition-all ${
+          toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {toast.message}
+          <button onClick={() => setToast(null)} className="ml-2 text-current opacity-50 hover:opacity-100">&times;</button>
+        </div>
+      )}
+
       {/* Header */}
       <h1 className="text-xl font-bold text-foreground uppercase tracking-wide">3D Models</h1>
 
@@ -1345,19 +1500,19 @@ export default function Models() {
 
                     {/* Pricing columns */}
                     <div className="flex items-center gap-6 shrink-0">
-                      <div className="text-center">
+                      <div className="text-center" title="Cost of Goods Sold">
                         <p className="text-[10px] font-semibold text-muted uppercase">COGS</p>
                         <p className="text-sm font-bold text-foreground">${ps?.totalCost?.toFixed(2) ?? '0.00'}</p>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center" title="Average Profit Per Print">
                         <p className="text-[10px] font-semibold text-muted uppercase">Avg. PPP</p>
                         <p className="text-sm font-bold text-foreground">${ps?.avgProfit?.toFixed(2) ?? '0.00'}</p>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center" title="Average Profit Per Hour">
                         <p className="text-[10px] font-semibold text-muted uppercase">Avg. PPH</p>
                         <p className="text-sm font-bold text-foreground">${ps?.avgProfitPerHour?.toFixed(2) ?? '0.00'}</p>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center" title="Average Gross Profit Margin">
                         <p className="text-[10px] font-semibold text-muted uppercase">Avg. GPM</p>
                         <p className="text-sm font-bold text-foreground">{ps?.avgProfitMargin?.toFixed(1) ?? '0.0'}%</p>
                       </div>

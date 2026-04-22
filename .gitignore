@@ -4,6 +4,9 @@ dist/
 uploads/
 *.log
 
+# Prisma generated client
+backend/src/generated/
+
 # Test artifacts
 test-results/
 playwright-report/

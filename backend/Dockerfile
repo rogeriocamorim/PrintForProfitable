@@ -1,18 +1,21 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY prisma ./prisma
-RUN npx prisma generate
+COPY prisma.config.ts ./
 COPY tsconfig.json ./
 COPY src ./src
+RUN npx prisma generate
 RUN npx tsc
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/generated ./dist/generated
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
 COPY package*.json ./
 RUN mkdir -p uploads
 EXPOSE 3001

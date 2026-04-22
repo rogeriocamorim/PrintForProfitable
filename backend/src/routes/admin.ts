@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../services/prisma";
-import { isAuthenticated, requireSuperAdmin } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated, requireSuperAdmin } from "../middleware/auth.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
@@ -126,7 +126,7 @@ router.get("/users", async (req: Request, res: Response) => {
 router.get("/users/:id", async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         farms: {
           include: {
@@ -159,13 +159,13 @@ router.patch("/users/:id", async (req: Request, res: Response) => {
     if (name !== undefined) data.name = name;
 
     // Prevent demoting yourself
-    if (req.params.id === req.user!.id && role && role !== "SUPER_ADMIN") {
+    if (req.params.id as string === req.user!.id && role && role !== "SUPER_ADMIN") {
       res.status(400).json({ error: "Cannot remove your own Super Admin role" });
       return;
     }
 
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data,
       select: {
         id: true,
@@ -221,7 +221,7 @@ router.get("/farms", async (req: Request, res: Response) => {
 router.get("/farms/:id", async (req: Request, res: Response) => {
   try {
     const farm = await prisma.farm.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         user: { select: { id: true, name: true, email: true } },
         printers: true,
@@ -250,7 +250,7 @@ router.get("/farms/:id", async (req: Request, res: Response) => {
 router.post("/impersonate/:userId", async (req: Request, res: Response) => {
   try {
     const targetUser = await prisma.user.findUnique({
-      where: { id: req.params.userId },
+      where: { id: req.params.userId as string },
     });
     if (!targetUser) {
       res.status(404).json({ error: "User not found" });
@@ -307,9 +307,9 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
     }
 
     const setting = await prisma.platformSettings.upsert({
-      where: { key: req.params.key },
+      where: { key: req.params.key as string },
       update: { value },
-      create: { key: req.params.key, value },
+      create: { key: req.params.key as string, value },
     });
     res.json(setting);
   } catch (err) {

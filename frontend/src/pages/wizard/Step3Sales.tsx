@@ -20,36 +20,42 @@ const PLATFORMS = [
     name: 'Etsy',
     icon: Store,
     fees: 'Transaction 6.5% + Payment Processing 3% + $0.25 + Listing $0.20/unit',
+    defaults: { transactionPct: '6.5', processingPct: '3', processingFlat: '0.25', listingFee: '0.20' },
   },
   {
     id: 'amazon',
     name: 'Amazon',
     icon: ShoppingBag,
     fees: 'Referral 15%',
+    defaults: { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
   },
   {
     id: 'shopify',
     name: 'Shopify',
     icon: ShoppingCart,
     fees: 'Payment Processing 2.9% + $0.30',
+    defaults: { transactionPct: '0', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
   },
   {
     id: 'tiktok',
     name: 'TikTok',
     icon: Video,
     fees: 'Referral 8% + Payment Processing 2.9% + $0.30',
+    defaults: { transactionPct: '8', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
   },
   {
     id: 'ebay',
     name: 'eBay',
     icon: Tag,
     fees: 'Final Value 13.25% + $0.30',
+    defaults: { transactionPct: '13.25', processingPct: '0', processingFlat: '0.30', listingFee: '0' },
   },
   {
     id: 'custom',
     name: 'Custom',
     icon: Settings,
     fees: 'No preset fees — configure your own',
+    defaults: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
   },
 ]
 
@@ -82,7 +88,7 @@ export default function Step3Sales() {
                 {
                   type: selectedPlatform.toUpperCase(),
                   shopName,
-                  feesConfig: { description: platform?.fees },
+                  feesConfig: platform?.defaults ?? {},
                   enabled: true,
                 },
               ]

@@ -1,9 +1,19 @@
 import { Router, Request, Response } from "express";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
 
 const router = Router();
 router.use(isAuthenticated);
+
+// Default fees per platform type (US region) — applied when wizard doesn't send numeric fees
+const PLATFORM_FEE_DEFAULTS: Record<string, Record<string, string>> = {
+  ETSY:    { transactionPct: '6.5', processingPct: '3', processingFlat: '0.25', listingFee: '0.20' },
+  AMAZON:  { transactionPct: '15', processingPct: '0', processingFlat: '0', listingFee: '0' },
+  SHOPIFY: { transactionPct: '0', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
+  TIKTOK:  { transactionPct: '8', processingPct: '2.9', processingFlat: '0.30', listingFee: '0' },
+  EBAY:    { transactionPct: '13.25', processingPct: '0', processingFlat: '0.30', listingFee: '0' },
+  CUSTOM:  { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+};
 
 // Helper to get the user's farm
 async function getUserFarm(userId: string) {
@@ -77,6 +87,8 @@ router.put("/step2", async (req: Request, res: Response) => {
               brand: string;
               model: string;
               powerConsumption?: number;
+              purchasePrice?: number;
+              expectedLifetimeHours?: number;
               imageUrl?: string;
               preselected?: boolean;
             }) => ({
@@ -84,6 +96,8 @@ router.put("/step2", async (req: Request, res: Response) => {
               brand: p.brand,
               model: p.model,
               powerConsumption: p.powerConsumption ?? 200,
+              purchasePrice: p.purchasePrice ?? 0,
+              expectedLifetimeHours: p.expectedLifetimeHours ?? 5000,
               imageUrl: p.imageUrl ?? null,
               preselected: p.preselected ?? false,
             })
@@ -151,13 +165,20 @@ router.put("/step3", async (req: Request, res: Response) => {
               shopName: string;
               feesConfig?: Record<string, unknown>;
               enabled?: boolean;
-            }) => ({
-              farmId: farm.id,
-              type: s.type as any,
-              shopName: s.shopName,
-              feesConfig: s.feesConfig ?? {},
-              enabled: s.enabled ?? true,
-            })
+            }) => {
+              const fc = s.feesConfig ?? {};
+              // If feesConfig has no numeric fee fields, apply platform defaults
+              const hasNumericFees = ['transactionPct', 'processingPct', 'processingFlat', 'listingFee']
+                .some(k => k in fc && fc[k] !== undefined);
+              const resolvedFees = hasNumericFees ? fc : (PLATFORM_FEE_DEFAULTS[s.type] ?? {});
+              return {
+                farmId: farm.id,
+                type: s.type as any,
+                shopName: s.shopName,
+                feesConfig: resolvedFees as any,
+                enabled: s.enabled ?? true,
+              };
+            }
           ),
         });
       }

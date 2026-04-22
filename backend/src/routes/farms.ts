@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
 
 const router = Router();
 router.use(isAuthenticated);
@@ -101,11 +101,11 @@ router.delete("/tax-rates/:id", async (req: Request, res: Response) => {
     if (!farm) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.taxRate.findFirst({
-      where: { id: req.params.id, farmId: farm.id },
+      where: { id: req.params.id as string, farmId: farm.id },
     });
     if (!existing) { res.status(404).json({ error: "Tax rate not found" }); return; }
 
-    await prisma.taxRate.delete({ where: { id: req.params.id } });
+    await prisma.taxRate.delete({ where: { id: req.params.id as string } });
     res.status(204).send();
   } catch (err) {
     console.error("Delete tax rate error:", err);

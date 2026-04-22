@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
 
 const router = Router();
 router.use(isAuthenticated);
@@ -66,13 +66,13 @@ router.put("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.shippingProfile.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Shipping profile not found" }); return; }
 
     const { name, customerPays, postageCost, deliveryMinDays, deliveryMaxDays } = req.body;
     const updated = await prisma.shippingProfile.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(name !== undefined && { name }),
         ...(customerPays !== undefined && { customerPays }),
@@ -95,11 +95,11 @@ router.delete("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.shippingProfile.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Shipping profile not found" }); return; }
 
-    await prisma.shippingProfile.delete({ where: { id: req.params.id } });
+    await prisma.shippingProfile.delete({ where: { id: req.params.id as string } });
     res.status(204).send();
   } catch (err) {
     console.error("Delete shipping profile error:", err);

@@ -3,7 +3,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import bcrypt from "bcryptjs";
-import prisma from "./prisma";
+import prisma from "./prisma.js";
 
 passport.serializeUser((user: Express.User, done) => {
   done(null, user.id);
@@ -93,7 +93,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
       async (
         _accessToken: string,
         _refreshToken: string,
-        profile: GitHubStrategy.Profile,
+        profile: any,
         done: (err: Error | null, user?: Express.User) => void
       ) => {
         try {

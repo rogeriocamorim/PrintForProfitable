@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
-import prisma from "../services/prisma";
-import { isAuthenticated } from "../middleware/auth";
+import prisma from "../services/prisma.js";
+import { isAuthenticated } from "../middleware/auth.js";
+import { recalcModelsForFilament } from "../services/recalc.js";
 
 const router = Router();
 router.use(isAuthenticated);
@@ -67,13 +68,13 @@ router.put("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.filament.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Filament not found" }); return; }
 
     const { brand, material, variant, costPerSpool, spoolWeight, colors } = req.body;
     const updated = await prisma.filament.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(brand !== undefined && { brand }),
         ...(material !== undefined && { material }),
@@ -83,6 +84,12 @@ router.put("/:id", async (req: Request, res: Response) => {
         ...(colors !== undefined && { colors }),
       },
     });
+
+    // Recalculate all models using this filament
+    if (costPerSpool !== undefined || spoolWeight !== undefined) {
+      await recalcModelsForFilament(updated.id);
+    }
+
     res.json(updated);
   } catch (err) {
     console.error("Update filament error:", err);
@@ -97,11 +104,11 @@ router.delete("/:id", async (req: Request, res: Response) => {
     if (!farmId) { res.status(404).json({ error: "Farm not found" }); return; }
 
     const existing = await prisma.filament.findFirst({
-      where: { id: req.params.id, farmId },
+      where: { id: req.params.id as string, farmId },
     });
     if (!existing) { res.status(404).json({ error: "Filament not found" }); return; }
 
-    await prisma.filament.delete({ where: { id: req.params.id } });
+    await prisma.filament.delete({ where: { id: req.params.id as string } });
     res.status(204).send();
   } catch (err) {
     console.error("Delete filament error:", err);

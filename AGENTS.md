@@ -5,8 +5,8 @@ Self-hosted 3D print pricing calculator. React frontend + Express backend + Post
 
 ## Critical: Will break if you get wrong
 
-- **Prisma v5 only.** v6/v7 removed `url` from datasource schema. Use `prisma@5` and `@prisma/client@5`.
-- **Backend is CommonJS.** `"type": "commonjs"` in package.json, `"module": "commonjs"` in tsconfig. Dev: `tsx watch src/index.ts`.
+- **Prisma v7.** Uses `prisma.config.ts` for datasource URL, `@prisma/adapter-pg` driver adapter, generated client at `src/generated/prisma/`. Run `npx prisma generate` explicitly (not auto-run by migrate). Schema provider is `"prisma-client"` (not `"prisma-client-js"`).
+- **Backend is ESM.** `"type": "module"` in package.json, `"module": "nodenext"` in tsconfig. All relative imports use `.js` extensions. `__dirname` replaced with `fileURLToPath(import.meta.url)`. Dev: `tsx watch src/index.ts`.
 - **Frontend is ESM.** `"type": "module"`, Vite 8, React 19. Tailwind v4 via `@tailwindcss/vite` plugin (no PostCSS config).
 - **`/auth/me` must return `{ user }` wrapper**, not flat user object. Frontend `fetchUser` expects this. Breaking it silently logs users out on page reload.
 - **OAuth routes are conditional.** Backend checks `if (process.env.GOOGLE_CLIENT_ID)` — returns 501 when missing. Frontend calls `GET /api/auth/providers` and hides buttons accordingly. Google/GitHub env vars exist but are **empty** in `.env`.
@@ -26,7 +26,9 @@ Self-hosted 3D print pricing calculator. React frontend + Express backend + Post
 ```
 backend/
   .env                          # DATABASE_URL, JWT_SECRET, empty OAuth vars
+  prisma.config.ts              # Prisma v7 config (datasource URL, schema path)
   prisma/schema.prisma          # 10+ models + UserRole enum + PlatformSettings
+  src/generated/prisma/         # Prisma generated client (gitignored, run `npx prisma generate`)
   src/index.ts                  # Express entry, port 3001
   src/middleware/auth.ts         # isAuthenticated, requireSuperAdmin
   src/routes/auth.ts            # register, login, /me, /providers, OAuth
