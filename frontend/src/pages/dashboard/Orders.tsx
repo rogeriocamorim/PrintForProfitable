@@ -7,7 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Card, CardContent } from '../../components/ui/Card'
 import {
   Plus, Trash2, Loader2, ShoppingCart, Search, Edit,
-  TrendingUp, DollarSign, Package, AlertCircle, ChevronDown,
+  TrendingUp, DollarSign, Package, AlertCircle,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -565,8 +565,6 @@ function OrderRow({
   onDelete: () => void
   onStatusChange: (s: OrderStatus) => void
 }) {
-  const [showStatusMenu, setShowStatusMenu] = useState(false)
-
   const thumb = order.model?.imagePath
     ? `/api/uploads/images/${order.model.imagePath}`
     : order.model?.thumbnailPath
@@ -612,29 +610,19 @@ function OrderRow({
         )}
       </td>
 
-      {/* Status — click to change */}
+      {/* Status — select to change */}
       <td className="px-4 py-3">
-        <div className="relative">
-          <button
-            className="flex items-center gap-1 group"
-            onClick={() => setShowStatusMenu(v => !v)}
+        <div className="relative inline-block">
+          <StatusBadge status={order.status} />
+          <select
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            value={order.status}
+            onChange={e => onStatusChange(e.target.value as OrderStatus)}
           >
-            <StatusBadge status={order.status} />
-            <ChevronDown className="h-3 w-3 text-muted group-hover:text-foreground transition-colors" />
-          </button>
-          {showStatusMenu && (
-            <div className="absolute left-0 top-8 z-20 w-36 rounded-lg border border-border bg-white shadow-dropdown py-1">
-              {(Object.keys(STATUS_META) as OrderStatus[]).map(s => (
-                <button
-                  key={s}
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-surface-raised transition-colors"
-                  onClick={() => { onStatusChange(s); setShowStatusMenu(false) }}
-                >
-                  {STATUS_META[s].label}
-                </button>
-              ))}
-            </div>
-          )}
+            {(Object.keys(STATUS_META) as OrderStatus[]).map(s => (
+              <option key={s} value={s}>{STATUS_META[s].label}</option>
+            ))}
+          </select>
         </div>
       </td>
 
