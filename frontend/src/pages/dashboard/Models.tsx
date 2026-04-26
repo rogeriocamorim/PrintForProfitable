@@ -506,9 +506,9 @@ export default function Models() {
           hasVariations: editForm.hasVariations,
           hasPersonalization: editForm.hasPersonalization,
           printerId: editForm.printerId || null,
-          prepTimeMinutes: parseFloat(editForm.prepTimeMinutes) || 1,
+          prepTimeMinutes: parseFloat(editForm.prepTimeMinutes) || 0,
           prepCostPerHour: parseFloat(editForm.prepCostPerHour) || null,
-          postTimeMinutes: parseFloat(editForm.postTimeMinutes) || 1,
+          postTimeMinutes: parseFloat(editForm.postTimeMinutes) || 0,
           postCostPerHour: parseFloat(editForm.postCostPerHour) || null,
           skus: editForm.skus.filter((s) => s.sku.trim()),
           parts: editForm.parts.map((p) => ({
