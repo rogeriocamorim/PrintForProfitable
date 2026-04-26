@@ -15,6 +15,7 @@ import printerRoutes from "./routes/printers.js";
 import filamentRoutes from "./routes/filaments.js";
 import platformRoutes from "./routes/platforms.js";
 import shippingRoutes from "./routes/shipping.js";
+import orderRoutes from "./routes/orders.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -78,6 +79,7 @@ app.use("/api/printers", printerRoutes);
 app.use("/api/filaments", filamentRoutes);
 app.use("/api/platforms", platformRoutes);
 app.use("/api/shipping", shippingRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Health check
 app.get("/api/health", (_req: Request, res: Response) => {
