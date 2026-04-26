@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import {
   Plus, Trash2, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle,
   Image as ImageIcon, ArrowLeft, ChevronDown, ChevronUp, Info,
-  Search, MoreVertical, Clock, Edit,
+  Search, Clock, Edit,
 } from 'lucide-react'
 
 // ─── Interfaces ──────────────────────────────────────
@@ -557,7 +557,9 @@ export default function Models() {
   const computedCosts = useCallback(() => {
     if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0, breakdown: null as any }
 
-    const filamentCost = editForm.parts.reduce((sum, p) =>
+    const qty = Math.max(1, parseInt(String(editForm.buildPlateQty)) || 1)
+
+    const filamentCostPlate = editForm.parts.reduce((sum, p) =>
       sum + p.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0), 0
     )
 
@@ -566,26 +568,36 @@ export default function Models() {
     const selectedPrinter = allPrinters.find((p) => p.id === editForm.printerId) ?? allPrinters[0] ?? null
     const watts = selectedPrinter?.powerConsumption ?? 200
     const electricityRate = detail.farm?.electricityRate ?? 0.12
-    const printCost = (electricityRate * watts / 1000) * printHours
+    const printCostPlate = (electricityRate * watts / 1000) * printHours
 
     const prepRate = parseFloat(editForm.prepCostPerHour) || 0
     const postRate = parseFloat(editForm.postCostPerHour) || 0
     const prepMins = parseFloat(editForm.prepTimeMinutes) || 0
     const postMins = parseFloat(editForm.postTimeMinutes) || 0
-    const prepCost = (prepRate / 60) * prepMins
-    const postCost = (postRate / 60) * postMins
-    const laborCost = prepCost + postCost
+    const prepCostPlate = (prepRate / 60) * prepMins
+    const postCostPlate = (postRate / 60) * postMins
+    const laborCostPlate = prepCostPlate + postCostPlate
 
     // Machinery cost: (purchasePrice / expectedLifetimeHours) * printHours
     const purchasePrice = selectedPrinter?.purchasePrice ?? 0
     const lifetimeHours = selectedPrinter?.expectedLifetimeHours ?? 5000
-    const machineryCost = lifetimeHours > 0 ? (purchasePrice / lifetimeHours) * printHours : 0
+    const machineryCostPlate = lifetimeHours > 0 ? (purchasePrice / lifetimeHours) * printHours : 0
 
     // Maintenance cost: maintenanceRate * printHours
     const maintenanceRate = (detail.farm as any)?.maintenanceRate ?? 0.15
-    const maintenanceCost = maintenanceRate * printHours
+    const maintenanceCostPlate = maintenanceRate * printHours
 
-    const suppliesCost = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
+    const suppliesCostPlate = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
+
+    // Per-item costs divided by plate quantity
+    const filamentCost = filamentCostPlate / qty
+    const printCost = printCostPlate / qty
+    const laborCost = laborCostPlate / qty
+    const machineryCost = machineryCostPlate / qty
+    const maintenanceCost = maintenanceCostPlate / qty
+    const suppliesCost = suppliesCostPlate / qty
+    const prepCost = prepCostPlate / qty
+    const postCost = postCostPlate / qty
 
     return {
       filament: filamentCost,
@@ -595,6 +607,7 @@ export default function Models() {
       maintenance: maintenanceCost,
       supplies: suppliesCost,
       total: filamentCost + printCost + laborCost + machineryCost + maintenanceCost + suppliesCost,
+      qty,
       breakdown: {
         printHours,
         watts,
@@ -1284,7 +1297,14 @@ export default function Models() {
 
         {/* COST SUMMARY WITH BREAKDOWN */}
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6">
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wide mb-4">Cost Breakdown</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Cost Breakdown</h2>
+            {costs.qty > 1 && (
+              <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-1 rounded-full">
+                Per item — plate has {costs.qty} items
+              </span>
+            )}
+          </div>
           <div className="space-y-3">
             {/* Filament */}
             <div className="flex items-start justify-between py-2 border-b border-border/50">
@@ -1295,7 +1315,8 @@ export default function Models() {
                     const fil = filaments.find(fl => fl.id === f.filamentId)
                     const g = parseFloat(f.grams) || 0
                     const rate = fil ? (fil.costPerSpool / fil.spoolWeight) : 0
-                    return <span key={i} className="block">{f.name || 'Unnamed'}: {g.toFixed(1)}g x ${rate.toFixed(4)}/g = ${(g * rate).toFixed(2)}</span>
+                    const itemG = costs.qty > 1 ? g / costs.qty : g
+                    return <span key={i} className="block">{f.name || 'Unnamed'}: {itemG.toFixed(1)}g x ${rate.toFixed(4)}/g = ${(itemG * rate).toFixed(2)}{costs.qty > 1 ? ` (÷${costs.qty})` : ''}</span>
                   })}
                 </p>
               </div>
@@ -1307,7 +1328,7 @@ export default function Models() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Electricity</p>
                 <p className="text-xs text-muted mt-0.5">
-                  ${costs.breakdown?.electricityRate.toFixed(2)}/kWh x {costs.breakdown?.watts}W / 1000 x {costs.breakdown?.printHours.toFixed(2)}h
+                  ${costs.breakdown?.electricityRate.toFixed(2)}/kWh x {costs.breakdown?.watts}W / 1000 x {costs.breakdown?.printHours.toFixed(2)}h{costs.qty > 1 ? ` ÷ ${costs.qty}` : ''}
                 </p>
               </div>
               <p className="text-sm font-bold text-foreground">${costs.print.toFixed(2)}</p>
@@ -1318,9 +1339,9 @@ export default function Models() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Labor</p>
                 <p className="text-xs text-muted mt-0.5">
-                  Prep: ${costs.breakdown?.prepRate.toFixed(2)}/hr x {costs.breakdown?.prepMins.toFixed(0)}min = ${costs.breakdown?.prepCost.toFixed(2)}
+                  Prep: ${costs.breakdown?.prepRate.toFixed(2)}/hr x {costs.breakdown?.prepMins.toFixed(0)}min = ${costs.breakdown?.prepCost.toFixed(2)}{costs.qty > 1 ? ` (÷${costs.qty})` : ''}
                   <br />
-                  Post: ${costs.breakdown?.postRate.toFixed(2)}/hr x {costs.breakdown?.postMins.toFixed(0)}min = ${costs.breakdown?.postCost.toFixed(2)}
+                  Post: ${costs.breakdown?.postRate.toFixed(2)}/hr x {costs.breakdown?.postMins.toFixed(0)}min = ${costs.breakdown?.postCost.toFixed(2)}{costs.qty > 1 ? ` (÷${costs.qty})` : ''}
                 </p>
               </div>
               <p className="text-sm font-bold text-foreground">${costs.labor.toFixed(2)}</p>
@@ -1331,7 +1352,7 @@ export default function Models() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Machinery</p>
                 <p className="text-xs text-muted mt-0.5">
-                  ${costs.breakdown?.purchasePrice.toFixed(0)} / {costs.breakdown?.lifetimeHours.toFixed(0)}h x {costs.breakdown?.printHours.toFixed(2)}h
+                  ${costs.breakdown?.purchasePrice.toFixed(0)} / {costs.breakdown?.lifetimeHours.toFixed(0)}h x {costs.breakdown?.printHours.toFixed(2)}h{costs.qty > 1 ? ` ÷ ${costs.qty}` : ''}
                 </p>
               </div>
               <p className="text-sm font-bold text-foreground">${costs.machinery.toFixed(2)}</p>
@@ -1342,7 +1363,7 @@ export default function Models() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Maintenance</p>
                 <p className="text-xs text-muted mt-0.5">
-                  ${costs.breakdown?.maintenanceRate.toFixed(2)}/hr x {costs.breakdown?.printHours.toFixed(2)}h
+                  ${costs.breakdown?.maintenanceRate.toFixed(2)}/hr x {costs.breakdown?.printHours.toFixed(2)}h{costs.qty > 1 ? ` ÷ ${costs.qty}` : ''}
                 </p>
               </div>
               <p className="text-sm font-bold text-foreground">${costs.maintenance.toFixed(2)}</p>
@@ -1354,7 +1375,7 @@ export default function Models() {
                 <p className="text-sm font-semibold text-foreground">Supplies</p>
                 <p className="text-xs text-muted mt-0.5">
                   {editForm.supplies.filter(s => s.name.trim()).length > 0
-                    ? editForm.supplies.filter(s => s.name.trim()).map((s, i) => <span key={i} className="block">{s.name}: ${(parseFloat(s.cost) || 0).toFixed(2)}</span>)
+                    ? editForm.supplies.filter(s => s.name.trim()).map((s, i) => <span key={i} className="block">{s.name}: ${(parseFloat(s.cost) || 0).toFixed(2)}{costs.qty > 1 ? ` (÷${costs.qty})` : ''}</span>)
                     : <span>No supplies added</span>
                   }
                 </p>
@@ -1364,7 +1385,7 @@ export default function Models() {
 
             {/* Total */}
             <div className="flex items-center justify-between pt-3">
-              <p className="text-sm font-bold text-primary uppercase" title="Cost of Goods Sold">Total COGS</p>
+              <p className="text-sm font-bold text-primary uppercase" title="Cost of Goods Sold">Total COGS{costs.qty > 1 ? ` (per item)` : ''}</p>
               <p className="text-lg font-bold text-primary">${costs.total.toFixed(2)}</p>
             </div>
           </div>

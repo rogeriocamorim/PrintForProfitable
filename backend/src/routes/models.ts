@@ -158,34 +158,44 @@ router.get("/", async (req: Request, res: Response) => {
       const printer = m.printer ?? farm.printers[0] ?? null;
       const printerWatts = printer?.powerConsumption ?? 200;
       const printTimeHours = m.printTimeMinutes / 60;
-      const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
+      const qty = Math.max(1, m.buildPlateQty ?? 1);
+
+      // Per-plate totals (for the whole print run)
+      const electricityCostPlate = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
       const prepRate = m.prepCostPerHour ?? farm.laborRate;
       const postRate = m.postCostPerHour ?? farm.laborRate;
-      const prepCost = (prepRate / 60) * m.prepTimeMinutes;
-      const postCost = (postRate / 60) * m.postTimeMinutes;
-      const laborCost = prepCost + postCost;
+      const prepCostPlate = (prepRate / 60) * m.prepTimeMinutes;
+      const postCostPlate = (postRate / 60) * m.postTimeMinutes;
+      const laborCostPlate = prepCostPlate + postCostPlate;
 
-      // Machinery depreciation: (purchasePrice / lifetimeHours) * printHours
-      const machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+      const machineryCostPlate = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
         ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours
         : 0;
 
-      // Maintenance: maintenanceRate * printHours
-      const maintenanceCost = farm.maintenanceRate * printTimeHours;
+      const maintenanceCostPlate = farm.maintenanceRate * printTimeHours;
 
-      let materialCost = 0;
+      let materialCostPlate = 0;
       if (m.parts.length > 0) {
         for (const part of m.parts) {
           for (const pf of part.filaments) {
-            materialCost += pf.totalCost;
+            materialCostPlate += pf.totalCost;
           }
         }
       } else {
         const filamentCostPerGram = m.filament ? m.filament.costPerSpool / m.filament.spoolWeight : 0.02;
-        materialCost = filamentCostPerGram * m.filamentUsageGrams;
+        materialCostPlate = filamentCostPerGram * m.filamentUsageGrams;
       }
 
-      const suppliesCost = m.supplies.reduce((sum, s) => sum + s.cost, 0);
+      const suppliesCostPlate = m.supplies.reduce((sum, s) => sum + s.cost, 0);
+
+      // Per-item costs: divide everything by buildPlateQty
+      const electricityCost = electricityCostPlate / qty;
+      const laborCost = laborCostPlate / qty;
+      const machineryCost = machineryCostPlate / qty;
+      const maintenanceCost = maintenanceCostPlate / qty;
+      const materialCost = materialCostPlate / qty;
+      const suppliesCost = suppliesCostPlate / qty;
+
       const baseCost = electricityCost + laborCost + materialCost + suppliesCost + machineryCost + maintenanceCost;
       const totalTaxRate = farm.taxRates.reduce((sum: number, t: any) => sum + t.rate, 0) / 100;
       const taxAmount = baseCost * totalTaxRate;
@@ -216,6 +226,7 @@ router.get("/", async (req: Request, res: Response) => {
           shippingCost: +shippingCost.toFixed(2),
           machineryCost: +machineryCost.toFixed(2),
           maintenanceCost: +maintenanceCost.toFixed(2),
+          buildPlateQty: qty,
           platformPricing,
         },
       };
@@ -497,40 +508,53 @@ router.get("/:id", async (req: Request, res: Response) => {
     const printerWatts = printer?.powerConsumption ?? 200;
 
     const printTimeHours = model.printTimeMinutes / 60;
-    const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
+    const qty = Math.max(1, model.buildPlateQty ?? 1);
+
+    // Per-plate totals
+    const electricityCostPlate = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
 
     // Labor: model-level prep/post times and rates (fall back to farm defaults)
     const prepRate = model.prepCostPerHour ?? farm.laborRate;
     const postRate = model.postCostPerHour ?? farm.laborRate;
-    const prepCost = (prepRate / 60) * model.prepTimeMinutes;
-    const postCost = (postRate / 60) * model.postTimeMinutes;
-    const laborCost = prepCost + postCost;
+    const prepCostPlate = (prepRate / 60) * model.prepTimeMinutes;
+    const postCostPlate = (postRate / 60) * model.postTimeMinutes;
+    const laborCostPlate = prepCostPlate + postCostPlate;
 
     // Machinery depreciation: (purchasePrice / lifetimeHours) * printHours
-    const machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+    const machineryCostPlate = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
       ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours
       : 0;
 
     // Maintenance: maintenanceRate * printHours
-    const maintenanceCost = farm.maintenanceRate * printTimeHours;
+    const maintenanceCostPlate = farm.maintenanceRate * printTimeHours;
 
     // Filament cost: from parts if available, otherwise legacy single-filament
-    let materialCost = 0;
+    let materialCostPlate = 0;
     if (model.parts.length > 0) {
       for (const part of model.parts) {
         for (const pf of part.filaments) {
-          materialCost += pf.totalCost;
+          materialCostPlate += pf.totalCost;
         }
       }
     } else {
       const filamentCostPerGram = model.filament
         ? model.filament.costPerSpool / model.filament.spoolWeight
         : 0.02;
-      materialCost = filamentCostPerGram * model.filamentUsageGrams;
+      materialCostPlate = filamentCostPerGram * model.filamentUsageGrams;
     }
 
-    // Supplies cost
-    const suppliesCost = model.supplies.reduce((sum, s) => sum + s.cost, 0);
+    // Supplies cost (per plate)
+    const suppliesCostPlate = model.supplies.reduce((sum, s) => sum + s.cost, 0);
+
+    // Per-item costs: divide everything by buildPlateQty
+    const electricityCost = electricityCostPlate / qty;
+    const prepCost = prepCostPlate / qty;
+    const postCost = postCostPlate / qty;
+    const laborCost = laborCostPlate / qty;
+    const machineryCost = machineryCostPlate / qty;
+    const maintenanceCost = maintenanceCostPlate / qty;
+    const materialCost = materialCostPlate / qty;
+    const suppliesCost = suppliesCostPlate / qty;
 
     const baseCost = electricityCost + laborCost + materialCost + suppliesCost + machineryCost + maintenanceCost;
 
@@ -561,6 +585,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       thumbnailUrl: model.thumbnailPath ? `/api/uploads/thumbnails/${model.thumbnailPath}` : null,
       pricing: {
         printerWatts,
+        buildPlateQty: qty,
         electricityCost: +electricityCost.toFixed(2),
         laborCost: +laborCost.toFixed(2),
         prepCost: +prepCost.toFixed(2),
