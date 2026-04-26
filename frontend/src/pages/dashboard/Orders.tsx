@@ -136,6 +136,7 @@ export default function Orders() {
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [pricingLoading, setPricingLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
@@ -159,17 +160,46 @@ export default function Orders() {
 
   useEffect(() => { load() }, [load])
 
-  // Auto-fill prices when model or platform changes
+  // Auto-fill COGS, sale price, fees when model or platform changes
   useEffect(() => {
     if (!form.modelId) return
-    const model = models.find(m => m.id === form.modelId)
-    if (!model) return
-    setForm(prev => ({
-      ...prev,
-      salePrice: prev.salePrice || String(model.suggestedPrice.toFixed(2)),
-      cogs: prev.cogs === '0' || prev.cogs === '' ? String(model.calculatedCost.toFixed(2)) : prev.cogs,
-    }))
-  }, [form.modelId, models])
+    // Only auto-fill when adding (not editing) — detect by editOrder being null
+    // We use a ref-like pattern: only update if form was just opened
+    setPricingLoading(true)
+    api<any>(`/models/${form.modelId}`)
+      .then(detail => {
+        const pricing = detail.pricing
+        if (!pricing) return
+
+        setForm(prev => {
+          // If a platform is selected, use per-platform pricing
+          if (prev.platformId && pricing.platformPricing?.length) {
+            const pp = pricing.platformPricing.find((p: any) => p.platformId === prev.platformId)
+            if (pp) {
+              return {
+                ...prev,
+                cogs: String(pricing.totalCost.toFixed(2)),
+                salePrice: String(pp.sellingPrice.toFixed(2)),
+                platformFee: String(pp.platformFees.toFixed(2)),
+                shippingRevenue: String(pricing.shippingRevenue.toFixed(2)),
+                shippingCost: String(pricing.shippingCost.toFixed(2)),
+              }
+            }
+          }
+          // No platform — use base COGS and suggested price
+          return {
+            ...prev,
+            cogs: String(pricing.totalCost.toFixed(2)),
+            salePrice: String(pricing.suggestedPrice.toFixed(2)),
+            platformFee: '0',
+            shippingRevenue: String(pricing.shippingRevenue.toFixed(2)),
+            shippingCost: String(pricing.shippingCost.toFixed(2)),
+          }
+        })
+      })
+      .catch(() => {/* ignore */})
+      .finally(() => setPricingLoading(false))
+  }, [form.modelId, form.platformId])
 
   function openAdd() {
     setForm(EMPTY_FORM)
@@ -342,7 +372,14 @@ export default function Orders() {
         </div>
 
         <div className="border-t border-border pt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-3">Financials</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Financials</p>
+            {pricingLoading && (
+              <span className="flex items-center gap-1 text-xs text-muted">
+                <Loader2 className="h-3 w-3 animate-spin" /> Updating prices…
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Sale Price" type="number" step="0.01" prefix="$" value={form.salePrice} onChange={e => setForm(f => ({ ...f, salePrice: e.target.value }))} required />
             <Input label="Shipping Revenue" type="number" step="0.01" prefix="$" value={form.shippingRevenue} onChange={e => setForm(f => ({ ...f, shippingRevenue: e.target.value }))} />
