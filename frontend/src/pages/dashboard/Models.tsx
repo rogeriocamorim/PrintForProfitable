@@ -555,7 +555,7 @@ export default function Models() {
 
   // Computed costs from edit form (with breakdown details)
   const computedCosts = useCallback(() => {
-    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0, breakdown: null as any }
+    if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0, qty: 1, breakdown: null as any }
 
     const qty = Math.max(1, parseInt(String(editForm.buildPlateQty)) || 1)
 
