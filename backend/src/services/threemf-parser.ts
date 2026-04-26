@@ -8,6 +8,8 @@ export interface ThreeMFMetadata {
   filamentUsageGrams: number | null;
   filamentType: string | null;
   slicer: string | null;
+  /** True when the file has no slice data (not yet sliced) */
+  isUnsliced: boolean;
   /** Thumbnail image buffer extracted from .3mf (PNG) */
   thumbnail: Buffer | null;
   /** Multiple plates in BambuStudio — aggregate totals */
@@ -47,6 +49,7 @@ export function parseThreeMF(filePath: string): ThreeMFMetadata {
     filamentUsageGrams: null,
     filamentType: null,
     slicer: null,
+    isUnsliced: false,
     thumbnail: null,
     plates: [],
   };
@@ -59,11 +62,13 @@ export function parseThreeMF(filePath: string): ThreeMFMetadata {
 
   // Extract thumbnail — try common paths across slicers
   const thumbnailPaths = [
-    "Metadata/plate_1.png",         // BambuStudio
-    "Metadata/plate_no_light_1.png", // BambuStudio (no-light variant)
-    "Metadata/thumbnail.png",        // PrusaSlicer
-    "thumbnail/thumbnail.png",       // Generic
-    "Metadata/top_1.png",            // BambuStudio top view
+    "Auxiliaries/.thumbnails/thumbnail_3mf.png",   // BambuStudio v2.6+
+    "Auxiliaries/.thumbnails/thumbnail_middle.png", // BambuStudio v2.6+ (medium)
+    "Metadata/plate_1.png",                         // BambuStudio legacy
+    "Metadata/plate_no_light_1.png",                // BambuStudio (no-light variant)
+    "Metadata/thumbnail.png",                        // PrusaSlicer
+    "thumbnail/thumbnail.png",                       // Generic
+    "Metadata/top_1.png",                            // BambuStudio top view
   ];
   for (const tp of thumbnailPaths) {
     const entry = entryMap.get(tp);
@@ -74,13 +79,20 @@ export function parseThreeMF(filePath: string): ThreeMFMetadata {
   }
 
   // Try each parser in order of popularity
-  if (tryPrusaSlicer(entryMap, result)) return result;
-  if (tryBambuStudio(entryMap, result)) return result;
-  if (tryCura(entryMap, result)) return result;
+  if (tryPrusaSlicer(entryMap, result)) return finalize(result);
+  if (tryBambuStudio(entryMap, result)) return finalize(result);
+  if (tryCura(entryMap, result)) return finalize(result);
 
   // Fallback: scan all entries for any recognizable config
   tryGenericConfig(entries, result);
 
+  return finalize(result);
+}
+
+function finalize(result: ThreeMFMetadata): ThreeMFMetadata {
+  if (result.printTimeMinutes == null || result.filamentUsageGrams == null) {
+    result.isUnsliced = true;
+  }
   return result;
 }
 
@@ -249,7 +261,8 @@ function tryBambuStudio(
     if (typeMatch) result.filamentType = typeMatch[1];
   }
 
-  return totalTime > 0 || totalWeight > 0;
+  // Always return true if we identified a BambuStudio file (slice_info.config exists)
+  return true;
 }
 
 // ─── Cura ──────────────────────────────────────────────────────────────────
