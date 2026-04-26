@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../../lib/api'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Card, CardContent } from '../../components/ui/Card'
@@ -272,7 +271,6 @@ export default function Orders() {
 
   // ─── Form modal content ────────────────────────────────────────────────────
 
-  const selectedModel = models.find(m => m.id === form.modelId)
   const previewProfit = (
     (parseFloat(form.salePrice) || 0) +
     (parseFloat(form.shippingRevenue) || 0) -
@@ -511,7 +509,7 @@ export default function Orders() {
         </p>
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" onClick={() => setDeleteOrder(null)}>Cancel</Button>
-          <Button variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleting}>
+          <Button variant="danger" className="flex-1" onClick={handleDelete} disabled={deleting}>
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
           </Button>
         </div>
@@ -643,14 +641,5 @@ function OrderRow({
         </div>
       </td>
     </tr>
-  )
-}
-
-function StatusBadge({ status }: { status: OrderStatus }) {
-  const m = STATUS_META[status]
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${m.color}`}>
-      {m.label}
-    </span>
   )
 }
