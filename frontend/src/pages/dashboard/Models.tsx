@@ -1520,33 +1520,21 @@ export default function Models() {
 
                     {/* Expand / actions */}
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-primary border border-primary/20 hover:bg-primary/5 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); openEditModel(model.id) }}
+                        title="Edit model"
+                      >
+                        <Edit className="h-3.5 w-3.5 inline-block mr-1" />Edit
+                      </button>
+                      <button
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(model.id) }}
+                        title="Delete model"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 inline-block mr-1" />Delete
+                      </button>
                       {isExpanded ? <ChevronUp className="h-5 w-5 text-muted" /> : <ChevronDown className="h-5 w-5 text-muted" />}
-                      <div className="relative" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="rounded p-1.5 text-muted hover:bg-surface-raised hover:text-foreground transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const menu = (e.currentTarget.nextElementSibling as HTMLElement)
-                            menu.classList.toggle('hidden')
-                          }}
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        <div className="hidden absolute right-0 top-8 z-10 w-36 rounded-lg border border-border bg-white shadow-dropdown py-1">
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-raised transition-colors"
-                            onClick={() => openEditModel(model.id)}
-                          >
-                            <Edit className="h-3.5 w-3.5" /> Edit
-                          </button>
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                            onClick={() => handleDelete(model.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
