@@ -1181,7 +1181,7 @@ export default function Models() {
                   if (!platform) return null
 
                   // Compute per-platform pricing when enabled
-                  let platformCalc: { sellingPrice: number; platformFees: number; profit: number; profitMargin: number; formula: string } | null = null
+                  let platformCalc: { sellingPrice: number; platformFees: number; profit: number; profitMargin: number; formula: string; shippingCost: number; shippingRevenue: number } | null = null
                   if (assignment.enabled) {
                     const fees = platform.feesConfig || {}
                     // Use pre-computed totals or fall back to granular fee fields
@@ -1195,21 +1195,22 @@ export default function Models() {
                     const shippingProfile = farmShipping.find((sp) => sp.id === assignment.shippingProfileId)
                     const shippingCost = shippingProfile?.postageCost ?? 0
                     const shippingRevenue = shippingProfile?.customerPays ?? 0
-                    const netShipping = shippingCost - shippingRevenue
 
+                    // Selling price covers COGS + platform fees + margin only.
+                    // Shipping is collected separately by the platform.
                     const denominator = 1 - pctFee - marginFraction
                     let sellingPrice: number
                     if (denominator > 0) {
-                      sellingPrice = (costs.total + netShipping + totalFlat) / denominator
+                      sellingPrice = (costs.total + totalFlat) / denominator
                     } else {
-                      sellingPrice = (costs.total + netShipping) * (1 + marginFraction) + totalFlat + costs.total * pctFee
+                      sellingPrice = costs.total * (1 + marginFraction) + totalFlat + costs.total * pctFee
                     }
-                    if (sellingPrice < costs.total + netShipping) sellingPrice = costs.total + netShipping
+                    if (sellingPrice < costs.total) sellingPrice = costs.total
 
                     const platformFees = sellingPrice * pctFee + totalFlat
-                    const profit = sellingPrice - costs.total - netShipping - platformFees
+                    const profit = sellingPrice - costs.total - platformFees
 
-                    const formula = `($${costs.total.toFixed(2)} COGS${netShipping !== 0 ? ` + $${netShipping.toFixed(2)} net shipping` : ''} + $${totalFlat.toFixed(2)} flat fee) / (1 - ${(pctFee * 100).toFixed(1)}% fee - ${targetMargin}% margin)`
+                    const formula = `($${costs.total.toFixed(2)} COGS + $${totalFlat.toFixed(2)} flat fee) / (1 - ${(pctFee * 100).toFixed(1)}% fee - ${targetMargin}% margin)`
 
                     platformCalc = {
                       sellingPrice: +sellingPrice.toFixed(2),
@@ -1217,6 +1218,8 @@ export default function Models() {
                       profit: +profit.toFixed(2),
                       profitMargin: sellingPrice > 0 ? +(profit / sellingPrice * 100).toFixed(1) : 0,
                       formula,
+                      shippingCost,
+                      shippingRevenue,
                     }
                   }
 
@@ -1284,7 +1287,12 @@ export default function Models() {
                               <p className={`font-semibold ${platformCalc.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{platformCalc.profitMargin}%</p>
                             </div>
                           </div>
-                          <p className="text-xs text-muted mt-2">{platformCalc.formula}</p>
+                          {platformCalc.shippingCost > 0 && (
+                            <p className="text-xs text-muted mt-1">
+                              Shipping: customer pays ${platformCalc.shippingRevenue.toFixed(2)} / postage costs ${platformCalc.shippingCost.toFixed(2)} — collected separately from item price
+                            </p>
+                          )}
+                          <p className="text-xs text-muted mt-1">{platformCalc.formula}</p>
                         </div>
                       )}
                     </div>

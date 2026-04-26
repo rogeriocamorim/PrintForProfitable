@@ -89,26 +89,26 @@ function computePlatformPricing(
         ((parseFloat(fees.processingFlat || "0") + parseFloat(fees.listingFee || "0")));
       const pctFraction = percentage / 100;
 
-      // Total cost includes shipping cost; shipping revenue offsets the selling price needed
-      // sellingPrice = (totalCost + shippingCost - shippingRevenue + flat) / (1 - pctFraction - margin/100)
+      // Selling price covers COGS + platform fees + target margin.
+      // Shipping is collected separately by the platform — shown as info only.
       const marginFraction = targetMargin / 100;
       const denominator = 1 - pctFraction - marginFraction;
-      const netShippingCost = shippingCost - shippingRevenue; // negative if customer overpays shipping
       let sellingPrice: number;
 
       if (denominator > 0) {
-        sellingPrice = (totalCostBeforeFees + netShippingCost + flat) / denominator;
+        sellingPrice = (totalCostBeforeFees + flat) / denominator;
       } else {
-        sellingPrice = (totalCostBeforeFees + netShippingCost) * (1 + marginFraction) + flat + totalCostBeforeFees * pctFraction;
+        sellingPrice = totalCostBeforeFees * (1 + marginFraction) + flat + totalCostBeforeFees * pctFraction;
       }
 
-      // Ensure selling price is at least the cost
-      if (sellingPrice < totalCostBeforeFees + netShippingCost) {
-        sellingPrice = totalCostBeforeFees + netShippingCost;
+      // Ensure selling price is at least COGS
+      if (sellingPrice < totalCostBeforeFees) {
+        sellingPrice = totalCostBeforeFees;
       }
 
       const platformFees = sellingPrice * pctFraction + flat;
-      const profit = sellingPrice - totalCostBeforeFees - netShippingCost - platformFees;
+      const netShippingCost = shippingCost - shippingRevenue; // informational: net shipping expense
+      const profit = sellingPrice - totalCostBeforeFees - platformFees;
 
       return {
         platformId: p.id,
