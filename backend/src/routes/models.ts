@@ -303,6 +303,17 @@ router.post("/upload/parse", upload.single("file"), async (req: Request, res: Re
 
     try {
       const metadata = parseThreeMF(filePath);
+
+      if (metadata.isUnsliced) {
+        // Clean up the uploaded file — no point keeping an unsliced 3mf
+        fs.unlink(filePath, () => {});
+        res.status(422).json({
+          error: "This file has not been sliced yet. Please open it in your slicer (BambuStudio, PrusaSlicer, OrcaSlicer, etc.), slice it, and export the sliced .3mf file.",
+          isUnsliced: true,
+        });
+        return;
+      }
+
       // Save thumbnail if extracted
       const thumbnailName = saveThumbnail(metadata.thumbnail, req.file.filename.replace(/\.[^.]+$/, ''));
       const { thumbnail: _thumb, ...metaWithoutBuffer } = metadata;

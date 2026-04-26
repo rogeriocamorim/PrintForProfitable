@@ -54,6 +54,7 @@ model Farm {
   salesPlatforms   SalesPlatform[]
   shippingProfiles ShippingProfile[]
   models           Model3D[]
+  orders           Order[]
 
   @@map("farms")
 }
@@ -131,6 +132,7 @@ model SalesPlatform {
 
   farm                    Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
   modelPlatformAssignments ModelPlatformAssignment[]
+  orders                  Order[]
 
   @@map("sales_platforms")
 }
@@ -186,6 +188,7 @@ model Model3D {
   parts     ModelPart[]
   supplies  ModelSupply[]
   platformAssignments ModelPlatformAssignment[]
+  orders              Order[]
 
   @@map("models_3d")
 }
@@ -235,6 +238,43 @@ model ModelSupply {
   model Model3D @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@map("model_supplies")
+}
+
+enum OrderStatus {
+  PENDING
+  PRINTING
+  PRINTED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  farmId           String
+  modelId          String?
+  platformId       String?
+  orderNumber      String?
+  customerName     String?
+  customerNote     String?
+  status           OrderStatus @default(PENDING)
+  quantity         Int         @default(1)
+  salePrice        Float
+  shippingRevenue  Float       @default(0)
+  shippingCost     Float       @default(0)
+  platformFee      Float       @default(0)
+  cogs             Float       @default(0)
+  profit           Float       @default(0)
+  orderedAt        DateTime    @default(now())
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  farm     Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  model    Model3D?       @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  platform SalesPlatform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
+
+  @@map("orders")
 }
 
 model ModelPlatformAssignment {

@@ -7,9 +7,9 @@ import { Badge } from '../../components/ui/Badge'
 import { Modal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
-  Plus, Trash2, Eye, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle,
+  Plus, Trash2, Loader2, Box, Upload, FileUp, CheckCircle, AlertCircle,
   Image as ImageIcon, ArrowLeft, ChevronDown, ChevronUp, Info,
-  Search, SlidersHorizontal, MoreVertical, Clock, Edit,
+  Search, MoreVertical, Clock, Edit,
 } from 'lucide-react'
 
 // ─── Interfaces ──────────────────────────────────────
@@ -242,6 +242,7 @@ export default function Models() {
   const [pageSize, setPageSize] = useState(25)
   const [mode, setMode] = useState<'manual' | 'upload'>('upload')
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ParseResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -272,6 +273,7 @@ export default function Models() {
   function resetForm() {
     setAddForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '', printerId: '' })
     setParseResult(null)
+    setUploadError(null)
     setMode('upload')
     setDragOver(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -300,6 +302,7 @@ export default function Models() {
   async function processFile(file: File) {
     setUploading(true)
     setParseResult(null)
+    setUploadError(null)
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -309,12 +312,20 @@ export default function Models() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       })
-      if (!res.ok) throw new Error('Upload failed')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        if (res.status === 422 && errData.isUnsliced) {
+          throw new Error('This file has not been sliced yet. Open it in BambuStudio / PrusaSlicer / OrcaSlicer, slice it, then re-export as .3mf.')
+        }
+        throw new Error(errData.error || `Upload failed (${res.status})`)
+      }
       const result: ParseResult = await res.json()
       setParseResult(result)
+      // Strip .gcode suffix from name if present (e.g. "rose(4).gcode" → "rose(4)")
+      const cleanName = (result.name || '').replace(/\.gcode$/i, '')
       setAddForm((prev) => ({
         ...prev,
-        name: result.name || prev.name,
+        name: cleanName || prev.name,
         printTimeMinutes: result.printTimeMinutes != null ? String(Math.round(result.printTimeMinutes)) : prev.printTimeMinutes,
         filamentUsageGrams: result.filamentUsageGrams != null ? String(Math.round(result.filamentUsageGrams * 100) / 100) : prev.filamentUsageGrams,
       }))
@@ -322,14 +333,20 @@ export default function Models() {
         const match = filaments.find((f) => f.material.toLowerCase() === result.filamentType!.toLowerCase())
         if (match) setAddForm((prev) => ({ ...prev, filamentId: match.id }))
       }
-    } catch { /* error */ } finally { setUploading(false) }
+      if (result.parseError) {
+        setUploadError(`File uploaded but metadata could not be extracted: ${result.parseError}. Please fill in the details manually.`)
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      let model: Model3D
       if (mode === 'upload' && parseResult) {
         const formData = new FormData()
         const fileInput = fileInputRef.current
@@ -346,9 +363,9 @@ export default function Models() {
           body: formData,
         })
         if (!res.ok) throw new Error('Upload failed')
-        model = await res.json()
+        await res.json()
       } else {
-        model = await api<Model3D>('/models', {
+        await api<Model3D>('/models', {
           method: 'POST',
           body: JSON.stringify({
             name: addForm.name,
@@ -1709,8 +1726,8 @@ export default function Models() {
                 ) : (
                   <>
                     <Upload className="h-8 w-8 text-muted mb-2" />
-                    <p className="text-sm font-medium text-foreground">Drop a .3mf file or click to browse</p>
-                    <p className="text-xs text-muted mt-1">Print time & filament usage will be extracted automatically</p>
+                    <p className="text-sm font-medium text-foreground">Drop a sliced .3mf file or click to browse</p>
+                    <p className="text-xs text-muted mt-1">Must be sliced — print time & filament will be extracted automatically</p>
                   </>
                 )}
               </div>
@@ -1718,6 +1735,12 @@ export default function Models() {
                 <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
                   <CheckCircle className="h-4 w-4 shrink-0" />
                   <span>Print time and filament usage auto-filled from {parseResult.slicer || 'file'} metadata. You can adjust below.</span>
+                </div>
+              )}
+              {uploadError && (
+                <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{uploadError}</span>
                 </div>
               )}
             </div>

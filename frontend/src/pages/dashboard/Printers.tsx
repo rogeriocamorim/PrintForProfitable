@@ -12,6 +12,8 @@ interface PrinterPreset {
   brand: string
   model: string
   powerConsumption: number
+  purchasePrice?: number
+  expectedLifetimeHours?: number
 }
 
 const PRINTER_PRESETS: PrinterPreset[] = [
@@ -180,6 +182,8 @@ export default function Printers() {
                       brand: preset.brand,
                       model: preset.model,
                       powerConsumption: String(preset.powerConsumption),
+                      purchasePrice: String(preset.purchasePrice ?? 0),
+                      expectedLifetimeHours: String(preset.expectedLifetimeHours ?? 5000),
                     })
                   }
                 }}
