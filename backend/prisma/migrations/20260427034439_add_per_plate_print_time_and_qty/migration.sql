@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "model_parts" ADD COLUMN     "buildPlateQty" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "printTimeMinutes" DOUBLE PRECISION NOT NULL DEFAULT 0;
