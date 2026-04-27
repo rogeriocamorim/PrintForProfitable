@@ -204,10 +204,12 @@ model ModelSku {
 }
 
 model ModelPart {
-  id        String @id @default(cuid())
-  modelId   String
-  name      String @default("Plate 1")
-  sortOrder Int    @default(0)
+  id                String @id @default(cuid())
+  modelId           String
+  name              String @default("Plate 1")
+  sortOrder         Int    @default(0)
+  printTimeMinutes  Float  @default(0)
+  buildPlateQty     Int    @default(1)
 
   model     Model3D            @relation(fields: [modelId], references: [id], onDelete: Cascade)
   filaments ModelPartFilament[]

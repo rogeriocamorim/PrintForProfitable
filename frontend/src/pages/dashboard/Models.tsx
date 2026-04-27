@@ -64,6 +64,8 @@ interface ModelPart {
   id?: string
   name: string
   sortOrder: number
+  printTimeMinutes: number
+  buildPlateQty: number
   filaments: ModelPartFilament[]
 }
 
@@ -217,6 +219,8 @@ interface EditFormState {
   skus: { sku: string }[]
   parts: {
     name: string
+    printTimeMinutes: string
+    buildPlateQty: string
     filaments: { name: string; filamentId: string; grams: string; totalCost: string }[]
   }[]
   supplies: { name: string; cost: string }[]
@@ -428,6 +432,8 @@ export default function Models() {
       parts: (d.parts || []).length > 0
         ? d.parts.map((p) => ({
             name: p.name,
+            printTimeMinutes: String(p.printTimeMinutes ?? 0),
+            buildPlateQty: String(p.buildPlateQty ?? 1),
             filaments: (p.filaments || []).map((f) => ({
               name: f.name,
               filamentId: f.filamentId || '',
@@ -437,6 +443,8 @@ export default function Models() {
           }))
         : [{
             name: 'Plate 1',
+            printTimeMinutes: String(d.printTimeMinutes ?? 0),
+            buildPlateQty: String(d.buildPlateQty ?? 1),
             filaments: d.filamentUsageGrams > 0
               ? [{
                   name: d.filament ? `${d.filament.material}` : 'Default',
@@ -488,7 +496,9 @@ export default function Models() {
     if (!detail || !editForm) return
     setSaving(true)
     try {
-      const printTimeMinutes = (parseInt(editForm.printHours) || 0) * 60 + (parseInt(editForm.printMinutes) || 0)
+      const printTimeMinutes = editForm.parts.length > 0
+        ? editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeMinutes) || 0), 0)
+        : (parseInt(editForm.printHours) || 0) * 60 + (parseInt(editForm.printMinutes) || 0)
       const totalFilamentGrams = editForm.parts.reduce((sum, p) =>
         sum + p.filaments.reduce((s, f) => s + (parseFloat(f.grams) || 0), 0), 0
       )
@@ -513,6 +523,8 @@ export default function Models() {
           skus: editForm.skus.filter((s) => s.sku.trim()),
           parts: editForm.parts.map((p) => ({
             name: p.name,
+            printTimeMinutes: parseFloat(p.printTimeMinutes) || 0,
+            buildPlateQty: parseInt(p.buildPlateQty) || 1,
             filaments: p.filaments.map((f) => ({
               name: f.name,
               filamentId: f.filamentId || null,
@@ -557,47 +569,40 @@ export default function Models() {
   const computedCosts = useCallback(() => {
     if (!editForm || !detail) return { filament: 0, print: 0, labor: 0, machinery: 0, maintenance: 0, supplies: 0, total: 0, qty: 1, breakdown: null as any }
 
-    const qty = Math.max(1, parseInt(String(editForm.buildPlateQty)) || 1)
-
-    const filamentCostPlate = editForm.parts.reduce((sum, p) =>
-      sum + p.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0), 0
-    )
-
-    const printHours = ((parseInt(editForm.printHours) || 0) * 60 + (parseInt(editForm.printMinutes) || 0)) / 60
     const allPrinters = detail.farm?.printers || printers
     const selectedPrinter = allPrinters.find((p) => p.id === editForm.printerId) ?? allPrinters[0] ?? null
     const watts = selectedPrinter?.powerConsumption ?? 200
     const electricityRate = detail.farm?.electricityRate ?? 0.12
-    const printCostPlate = (electricityRate * watts / 1000) * printHours
+    const purchasePrice = selectedPrinter?.purchasePrice ?? 0
+    const lifetimeHours = selectedPrinter?.expectedLifetimeHours ?? 5000
+    const maintenanceRate = (detail.farm as any)?.maintenanceRate ?? 0.15
+
+    // Per-plate: sum per-unit costs across all plates
+    let filamentCost = 0
+    let printCost = 0
+    let machineryCost = 0
+    let maintenanceCost = 0
+
+    for (const part of editForm.parts) {
+      const plateQty = Math.max(1, parseInt(part.buildPlateQty) || 1)
+      const plateHours = (parseFloat(part.printTimeMinutes) || 0) / 60
+      printCost += ((electricityRate * watts / 1000) * plateHours) / plateQty
+      machineryCost += lifetimeHours > 0 ? ((purchasePrice / lifetimeHours) * plateHours) / plateQty : 0
+      maintenanceCost += (maintenanceRate * plateHours) / plateQty
+      filamentCost += part.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0) / plateQty
+    }
 
     const prepRate = parseFloat(editForm.prepCostPerHour) || 0
     const postRate = parseFloat(editForm.postCostPerHour) || 0
     const prepMins = parseFloat(editForm.prepTimeMinutes) || 0
     const postMins = parseFloat(editForm.postTimeMinutes) || 0
-    const prepCostPlate = (prepRate / 60) * prepMins
-    const postCostPlate = (postRate / 60) * postMins
-    const laborCostPlate = prepCostPlate + postCostPlate
+    const prepCost = (prepRate / 60) * prepMins
+    const postCost = (postRate / 60) * postMins
+    const laborCost = prepCost + postCost
+    const suppliesCost = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
 
-    // Machinery cost: (purchasePrice / expectedLifetimeHours) * printHours
-    const purchasePrice = selectedPrinter?.purchasePrice ?? 0
-    const lifetimeHours = selectedPrinter?.expectedLifetimeHours ?? 5000
-    const machineryCostPlate = lifetimeHours > 0 ? (purchasePrice / lifetimeHours) * printHours : 0
-
-    // Maintenance cost: maintenanceRate * printHours
-    const maintenanceRate = (detail.farm as any)?.maintenanceRate ?? 0.15
-    const maintenanceCostPlate = maintenanceRate * printHours
-
-    const suppliesCostPlate = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
-
-    // Per-item costs divided by plate quantity
-    const filamentCost = filamentCostPlate / qty
-    const printCost = printCostPlate / qty
-    const laborCost = laborCostPlate / qty
-    const machineryCost = machineryCostPlate / qty
-    const maintenanceCost = maintenanceCostPlate / qty
-    const suppliesCost = suppliesCostPlate / qty
-    const prepCost = prepCostPlate / qty
-    const postCost = postCostPlate / qty
+    // For display: total plate print hours (first plate or sum)
+    const totalPrintHours = editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeMinutes) || 0), 0) / 60
 
     return {
       filament: filamentCost,
@@ -607,9 +612,9 @@ export default function Models() {
       maintenance: maintenanceCost,
       supplies: suppliesCost,
       total: filamentCost + printCost + laborCost + machineryCost + maintenanceCost + suppliesCost,
-      qty,
+      qty: 1,
       breakdown: {
-        printHours,
+        printHours: totalPrintHours,
         watts,
         electricityRate,
         prepRate,
@@ -789,7 +794,7 @@ export default function Models() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Input
                       label="Category *"
@@ -798,34 +803,6 @@ export default function Models() {
                     />
                     <p className="text-xs text-muted mt-0.5">Select existing or type new category</p>
                   </div>
-                  <div>
-                    <Input
-                      label="Build Plate Qty"
-                      type="number"
-                      value={String(editForm.buildPlateQty)}
-                      onChange={(e) => setEditForm({ ...editForm, buildPlateQty: parseInt(e.target.value) || 1 })}
-                    />
-                    <p className="text-xs text-muted mt-0.5">1 = already per unit</p>
-                  </div>
-                  <div>
-                    <Input
-                      label="Print Hours"
-                      type="number"
-                      value={editForm.printHours}
-                      onChange={(e) => setEditForm({ ...editForm, printHours: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Input
-                      label="Print Minutes"
-                      type="number"
-                      value={editForm.printMinutes}
-                      onChange={(e) => setEditForm({ ...editForm, printMinutes: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="Designer"
                     value={editForm.designer}
@@ -911,11 +888,11 @@ export default function Models() {
           </CardContent>
         </Card>
 
-        {/* PARTS & FILAMENTS */}
+        {/* PLATES & FILAMENTS */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-primary uppercase tracking-wide">Parts & Filaments</h2>
+              <h2 className="text-sm font-bold text-primary uppercase tracking-wide">Plates & Filaments</h2>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted">
                   {editForm.parts.reduce((sum, p) => sum + p.filaments.reduce((s, f) => s + (parseFloat(f.grams) || 0), 0), 0).toFixed(1)}g total
@@ -954,6 +931,47 @@ export default function Models() {
                 {/* Filament rows */}
                 {expandedParts.has(pIdx) && (
                   <div className="border-t border-border px-4 py-3 space-y-3">
+                    {/* Per-plate print settings */}
+                    <div className="grid grid-cols-3 gap-3 pb-2 border-b border-border-light">
+                      <div>
+                        <label className="block text-xs font-medium text-muted mb-1">Print Time (minutes)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                          value={part.printTimeMinutes}
+                          onChange={(e) => {
+                            const newParts = [...editForm.parts]
+                            newParts[pIdx] = { ...newParts[pIdx], printTimeMinutes: e.target.value }
+                            setEditForm({ ...editForm, parts: newParts })
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted mb-1">Items per Plate</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                          value={part.buildPlateQty}
+                          onChange={(e) => {
+                            const newParts = [...editForm.parts]
+                            newParts[pIdx] = { ...newParts[pIdx], buildPlateQty: e.target.value }
+                            setEditForm({ ...editForm, parts: newParts })
+                          }}
+                        />
+                        <p className="text-xs text-muted mt-0.5">How many units fit on this plate</p>
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <span className="text-xs text-muted">
+                          Cost/unit: <span className="font-medium text-foreground">
+                            ${((part.filaments.reduce((s, f) => s + (parseFloat(f.totalCost) || 0), 0)) / Math.max(1, parseInt(part.buildPlateQty) || 1)).toFixed(2)}
+                          </span> filament
+                        </span>
+                      </div>
+                    </div>
                     {part.filaments.map((fil, fIdx) => (
                       <div key={fIdx} className="grid grid-cols-[1fr_2fr_80px_100px_40px] gap-3 items-end">
                         <div>
@@ -1031,10 +1049,10 @@ export default function Models() {
               className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
               onClick={() => setEditForm({
                 ...editForm,
-                parts: [...editForm.parts, { name: `Plate ${editForm.parts.length + 1}`, filaments: [] }],
+                parts: [...editForm.parts, { name: `Plate ${editForm.parts.length + 1}`, printTimeMinutes: '0', buildPlateQty: '1', filaments: [] }],
               })}
             >
-              <Plus className="h-3.5 w-3.5" /> Add Model Part
+              <Plus className="h-3.5 w-3.5" /> Add Plate
             </button>
           </CardContent>
         </Card>
