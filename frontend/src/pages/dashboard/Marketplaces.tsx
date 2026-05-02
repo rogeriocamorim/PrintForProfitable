@@ -18,10 +18,10 @@ interface SalesPlatform {
   createdAt: string
 }
 
-const PLATFORM_TYPES = ['ETSY', 'AMAZON', 'SHOPIFY', 'TIKTOK', 'EBAY', 'CUSTOM']
+const PLATFORM_TYPES = ['ETSY', 'AMAZON', 'SHOPIFY', 'TIKTOK', 'EBAY', 'SQUARE', 'DIRECT', 'CUSTOM']
 
 const platformBadge: Record<string, 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'default'> = {
-  ETSY: 'primary', AMAZON: 'warning', SHOPIFY: 'success', TIKTOK: 'danger', EBAY: 'info', CUSTOM: 'default',
+  ETSY: 'primary', AMAZON: 'warning', SHOPIFY: 'success', TIKTOK: 'danger', EBAY: 'info', SQUARE: 'info', DIRECT: 'success', CUSTOM: 'default',
 }
 
 type Country = 'US' | 'CA' | 'UK' | 'EU' | 'DE' | 'FR' | 'ES' | 'IT' | 'NL' | 'BR' | 'MX' | 'AU' | 'NZ' | 'JP' | 'KR' | 'IN' | 'SG' | 'ZA'
@@ -62,6 +62,8 @@ const PLATFORM_FEE_LABELS: Record<string, { transactionPct?: string; processingP
   SHOPIFY: { processingPct: 'Payment Processing', processingFlat: 'Processing Flat Fee' },
   TIKTOK:  { transactionPct: 'Referral Fee', processingPct: 'Payment Processing', processingFlat: 'Processing Flat Fee' },
   EBAY:    { transactionPct: 'Final Value Fee', processingFlat: 'Per-Order Fee' },
+  SQUARE:  { transactionPct: 'Credit Card Fee (2.5%)', processingFlat: 'Flat Fee' },
+  DIRECT:  {},
   CUSTOM:  { transactionPct: 'Fee Percentage', processingFlat: 'Flat Fee per Sale' },
 }
 
@@ -165,6 +167,46 @@ const PLATFORM_DEFAULTS: Record<string, Record<Country, FeeDefaults>> = {
     IN: { transactionPct: '12', processingPct: '0', processingFlat: '0', listingFee: '0' },
     SG: { transactionPct: '13.25', processingPct: '0', processingFlat: '0.30', listingFee: '0' },
     ZA: { transactionPct: '13.25', processingPct: '0', processingFlat: '0', listingFee: '0' },
+  },
+  SQUARE: {
+    US: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    CA: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    UK: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    EU: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    DE: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    FR: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    ES: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    IT: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    NL: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    BR: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    MX: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    NZ: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    JP: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    KR: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    IN: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    SG: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    ZA: { transactionPct: '2.5', processingPct: '0', processingFlat: '0', listingFee: '0' },
+  },
+  DIRECT: {
+    US: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    CA: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    UK: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    EU: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    DE: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    FR: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    ES: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    IT: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    NL: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    BR: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    MX: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    AU: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    NZ: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    JP: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    KR: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    IN: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    SG: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
+    ZA: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
   },
   CUSTOM: {
     US: { transactionPct: '0', processingPct: '0', processingFlat: '0', listingFee: '0' },
@@ -401,7 +443,7 @@ export default function Marketplaces() {
           <div className="rounded-lg border border-border bg-surface-raised p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted uppercase tracking-wide">Platform Fees</p>
-              {formBase.type !== 'CUSTOM' && (
+              {formBase.type !== 'CUSTOM' && formBase.type !== 'DIRECT' && (
                 <button
                   type="button"
                   className="text-xs text-primary hover:underline"

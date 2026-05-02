@@ -118,6 +118,8 @@ enum PlatformType {
   SHOPIFY
   TIKTOK
   EBAY
+  SQUARE
+  DIRECT
   CUSTOM
 }
 
