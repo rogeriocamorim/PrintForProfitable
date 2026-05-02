@@ -271,6 +271,7 @@ if [ "$DEPLOY_BACKEND" = true ]; then
         --exclude='node_modules' \
         --exclude='dist' \
         --exclude='src/generated' \
+        --exclude='.env' \
         . | tar -xf - -C "$DEPLOY_DIR/backend"
     echo "   [ok] Backend files added (node_modules, dist, generated excluded)"
 fi
@@ -358,7 +359,9 @@ eval "$SSH_CMD $REMOTE_USER@$REMOTE_HOST" << 'ENDSSH'
             echo "   [ok] Old backend backed up -> $BKDIR"
         fi
         mv "$TEMP/backend" /opt/printforprofitable/
-        echo "   [ok] New backend in place"
+        # Remove any stale .env — container gets DATABASE_URL from docker-compose env vars
+        rm -f /opt/printforprofitable/backend/.env
+        echo "   [ok] New backend in place (stale .env removed)"
     fi
 
     # ── Frontend ──
