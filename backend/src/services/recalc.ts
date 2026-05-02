@@ -102,39 +102,46 @@ export async function recalcModelCost(modelId: string): Promise<void> {
   const farm = model.farm;
   const printer = model.printer ?? farm.printers[0] ?? null;
   const printerWatts = printer?.powerConsumption ?? 200;
-  const printTimeHours = model.printTimeMinutes / 60;
 
-  // Electricity
-  const electricityCost = (farm.electricityRate * printerWatts / 1000) * printTimeHours;
-
-  // Labor
+  // Labor (model-level, per unit)
   const prepRate = model.prepCostPerHour ?? farm.laborRate;
   const postRate = model.postCostPerHour ?? farm.laborRate;
   const prepCost = (prepRate / 60) * model.prepTimeMinutes;
   const postCost = (postRate / 60) * model.postTimeMinutes;
   const laborCost = prepCost + postCost;
 
-  // Machinery depreciation
-  const machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
-    ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours
-    : 0;
-
-  // Maintenance
-  const maintenanceCost = farm.maintenanceRate * printTimeHours;
-
-  // Material cost
+  let electricityCost = 0;
+  let machineryCost = 0;
+  let maintenanceCost = 0;
   let materialCost = 0;
+
   if (model.parts.length > 0) {
+    // Multi-plate: each part (plate) contributes a per-unit cost = plate cost / buildPlateQty
     for (const part of model.parts) {
+      const plateQty = Math.max(1, part.buildPlateQty ?? 1);
+      const platePrintHours = (part.printTimeMinutes ?? 0) / 60;
+      electricityCost += ((farm.electricityRate * printerWatts / 1000) * platePrintHours) / plateQty;
+      machineryCost += printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+        ? ((printer.purchasePrice / printer.expectedLifetimeHours) * platePrintHours) / plateQty
+        : 0;
+      maintenanceCost += (farm.maintenanceRate * platePrintHours) / plateQty;
       for (const pf of part.filaments) {
-        materialCost += pf.totalCost;
+        materialCost += pf.totalCost / plateQty;
       }
     }
   } else {
+    // Legacy single-plate
+    const printTimeHours = model.printTimeMinutes / 60;
+    const qty = Math.max(1, model.buildPlateQty ?? 1);
+    electricityCost = ((farm.electricityRate * printerWatts / 1000) * printTimeHours) / qty;
+    machineryCost = printer && printer.purchasePrice > 0 && printer.expectedLifetimeHours > 0
+      ? (printer.purchasePrice / printer.expectedLifetimeHours) * printTimeHours / qty
+      : 0;
+    maintenanceCost = (farm.maintenanceRate * printTimeHours) / qty;
     const filamentCostPerGram = model.filament
       ? model.filament.costPerSpool / model.filament.spoolWeight
       : 0.02;
-    materialCost = filamentCostPerGram * model.filamentUsageGrams;
+    materialCost = filamentCostPerGram * model.filamentUsageGrams / qty;
   }
 
   // Supplies

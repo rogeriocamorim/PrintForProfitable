@@ -219,7 +219,8 @@ interface EditFormState {
   skus: { sku: string }[]
   parts: {
     name: string
-    printTimeMinutes: string
+    printTimeHours: string
+    printTimeMins: string
     buildPlateQty: string
     filaments: { name: string; filamentId: string; grams: string; totalCost: string }[]
   }[]
@@ -252,7 +253,8 @@ export default function Models() {
   const [dragOver, setDragOver] = useState(false)
   const [addForm, setAddForm] = useState({
     name: '',
-    printTimeMinutes: '',
+    printTimeHours: '',
+    printTimeMins: '',
     filamentUsageGrams: '',
     filamentId: '',
     printerId: '',
@@ -275,7 +277,7 @@ export default function Models() {
   }, [])
 
   function resetForm() {
-    setAddForm({ name: '', printTimeMinutes: '', filamentUsageGrams: '', filamentId: '', printerId: '' })
+    setAddForm({ name: '', printTimeHours: '', printTimeMins: '', filamentUsageGrams: '', filamentId: '', printerId: '' })
     setParseResult(null)
     setUploadError(null)
     setMode('upload')
@@ -330,7 +332,8 @@ export default function Models() {
       setAddForm((prev) => ({
         ...prev,
         name: cleanName || prev.name,
-        printTimeMinutes: result.printTimeMinutes != null ? String(Math.round(result.printTimeMinutes)) : prev.printTimeMinutes,
+        printTimeHours: result.printTimeMinutes != null ? String(Math.floor(result.printTimeMinutes / 60)) : prev.printTimeHours,
+        printTimeMins: result.printTimeMinutes != null ? String(Math.round(result.printTimeMinutes % 60)) : prev.printTimeMins,
         filamentUsageGrams: result.filamentUsageGrams != null ? String(Math.round(result.filamentUsageGrams * 100) / 100) : prev.filamentUsageGrams,
       }))
       if (result.filamentType && filaments.length > 0) {
@@ -356,7 +359,7 @@ export default function Models() {
         const fileInput = fileInputRef.current
         if (fileInput?.files?.[0]) formData.append('file', fileInput.files[0])
         formData.append('name', addForm.name)
-        formData.append('printTimeMinutes', addForm.printTimeMinutes)
+        formData.append('printTimeMinutes', String((parseFloat(addForm.printTimeHours) || 0) * 60 + (parseFloat(addForm.printTimeMins) || 0)))
         formData.append('filamentUsageGrams', addForm.filamentUsageGrams)
         if (addForm.filamentId) formData.append('filamentId', addForm.filamentId)
         if (addForm.printerId) formData.append('printerId', addForm.printerId)
@@ -373,7 +376,7 @@ export default function Models() {
           method: 'POST',
           body: JSON.stringify({
             name: addForm.name,
-            printTimeMinutes: parseFloat(addForm.printTimeMinutes),
+            printTimeMinutes: (parseFloat(addForm.printTimeHours) || 0) * 60 + (parseFloat(addForm.printTimeMins) || 0),
             filamentUsageGrams: parseFloat(addForm.filamentUsageGrams),
             filamentId: addForm.filamentId || null,
             printerId: addForm.printerId || null,
@@ -432,7 +435,8 @@ export default function Models() {
       parts: (d.parts || []).length > 0
         ? d.parts.map((p) => ({
             name: p.name,
-            printTimeMinutes: String(p.printTimeMinutes ?? 0),
+            printTimeHours: String(Math.floor((p.printTimeMinutes ?? 0) / 60)),
+            printTimeMins: String(Math.round((p.printTimeMinutes ?? 0) % 60)),
             buildPlateQty: String(p.buildPlateQty ?? 1),
             filaments: (p.filaments || []).map((f) => ({
               name: f.name,
@@ -443,7 +447,8 @@ export default function Models() {
           }))
         : [{
             name: 'Plate 1',
-            printTimeMinutes: String(d.printTimeMinutes ?? 0),
+            printTimeHours: String(Math.floor((d.printTimeMinutes ?? 0) / 60)),
+            printTimeMins: String(Math.round((d.printTimeMinutes ?? 0) % 60)),
             buildPlateQty: String(d.buildPlateQty ?? 1),
             filaments: d.filamentUsageGrams > 0
               ? [{
@@ -497,7 +502,7 @@ export default function Models() {
     setSaving(true)
     try {
       const printTimeMinutes = editForm.parts.length > 0
-        ? editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeMinutes) || 0), 0)
+        ? editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeHours) || 0) * 60 + (parseFloat(p.printTimeMins) || 0), 0)
         : (parseInt(editForm.printHours) || 0) * 60 + (parseInt(editForm.printMinutes) || 0)
       const totalFilamentGrams = editForm.parts.reduce((sum, p) =>
         sum + p.filaments.reduce((s, f) => s + (parseFloat(f.grams) || 0), 0), 0
@@ -523,7 +528,7 @@ export default function Models() {
           skus: editForm.skus.filter((s) => s.sku.trim()),
           parts: editForm.parts.map((p) => ({
             name: p.name,
-            printTimeMinutes: parseFloat(p.printTimeMinutes) || 0,
+            printTimeMinutes: (parseFloat(p.printTimeHours) || 0) * 60 + (parseFloat(p.printTimeMins) || 0),
             buildPlateQty: parseInt(p.buildPlateQty) || 1,
             filaments: p.filaments.map((f) => ({
               name: f.name,
@@ -585,7 +590,7 @@ export default function Models() {
 
     for (const part of editForm.parts) {
       const plateQty = Math.max(1, parseInt(part.buildPlateQty) || 1)
-      const plateHours = (parseFloat(part.printTimeMinutes) || 0) / 60
+      const plateHours = ((parseFloat(part.printTimeHours) || 0) * 60 + (parseFloat(part.printTimeMins) || 0)) / 60
       printCost += ((electricityRate * watts / 1000) * plateHours) / plateQty
       machineryCost += lifetimeHours > 0 ? ((purchasePrice / lifetimeHours) * plateHours) / plateQty : 0
       maintenanceCost += (maintenanceRate * plateHours) / plateQty
@@ -602,7 +607,7 @@ export default function Models() {
     const suppliesCost = editForm.supplies.reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0)
 
     // For display: total plate print hours (first plate or sum)
-    const totalPrintHours = editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeMinutes) || 0), 0) / 60
+    const totalPrintHours = editForm.parts.reduce((sum, p) => sum + (parseFloat(p.printTimeHours) || 0) + (parseFloat(p.printTimeMins) || 0) / 60, 0)
 
     return {
       filament: filamentCost,
@@ -1049,7 +1054,7 @@ export default function Models() {
               className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
               onClick={() => setEditForm({
                 ...editForm,
-                parts: [...editForm.parts, { name: `Plate ${editForm.parts.length + 1}`, printTimeMinutes: '0', buildPlateQty: '1', filaments: [] }],
+                parts: [...editForm.parts, { name: `Plate ${editForm.parts.length + 1}`, printTimeHours: '0', printTimeMins: '0', buildPlateQty: '1', filaments: [] }],
               })}
             >
               <Plus className="h-3.5 w-3.5" /> Add Plate
