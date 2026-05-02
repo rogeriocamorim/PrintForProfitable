@@ -939,19 +939,38 @@ export default function Models() {
                     {/* Per-plate print settings */}
                     <div className="grid grid-cols-3 gap-3 pb-2 border-b border-border-light">
                       <div>
-                        <label className="block text-xs font-medium text-muted mb-1">Print Time (minutes)</label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
-                          value={part.printTimeMinutes}
-                          onChange={(e) => {
-                            const newParts = [...editForm.parts]
-                            newParts[pIdx] = { ...newParts[pIdx], printTimeMinutes: e.target.value }
-                            setEditForm({ ...editForm, parts: newParts })
-                          }}
-                        />
+                        <label className="block text-xs font-medium text-muted mb-1">Print Time</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            placeholder="0"
+                            className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                            value={part.printTimeHours}
+                            onChange={(e) => {
+                              const newParts = [...editForm.parts]
+                              newParts[pIdx] = { ...newParts[pIdx], printTimeHours: e.target.value }
+                              setEditForm({ ...editForm, parts: newParts })
+                            }}
+                          />
+                          <span className="text-xs text-muted shrink-0">h</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="59"
+                            placeholder="0"
+                            className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                            value={part.printTimeMins}
+                            onChange={(e) => {
+                              const newParts = [...editForm.parts]
+                              newParts[pIdx] = { ...newParts[pIdx], printTimeMins: e.target.value }
+                              setEditForm({ ...editForm, parts: newParts })
+                            }}
+                          />
+                          <span className="text-xs text-muted shrink-0">min</span>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-muted mb-1">Items per Plate</label>
@@ -1799,7 +1818,32 @@ export default function Models() {
           )}
 
           <Input label="Model Name" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} required />
-          <Input label="Print Time (minutes)" type="number" step="1" suffix="min" value={addForm.printTimeMinutes} onChange={(e) => setAddForm({ ...addForm, printTimeMinutes: e.target.value })} required />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-foreground">Print Time</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="1"
+                min="0"
+                placeholder="0"
+                className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                value={addForm.printTimeHours}
+                onChange={(e) => setAddForm({ ...addForm, printTimeHours: e.target.value })}
+              />
+              <span className="text-sm text-muted shrink-0">h</span>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                max="59"
+                placeholder="0"
+                className="flex h-9 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
+                value={addForm.printTimeMins}
+                onChange={(e) => setAddForm({ ...addForm, printTimeMins: e.target.value })}
+              />
+              <span className="text-sm text-muted shrink-0">min</span>
+            </div>
+          </div>
           <Input label="Filament Usage" type="number" step="0.1" suffix="grams" value={addForm.filamentUsageGrams} onChange={(e) => setAddForm({ ...addForm, filamentUsageGrams: e.target.value })} required />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">Filament</label>
