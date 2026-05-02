@@ -273,6 +273,9 @@ export default function Models() {
       setModels(m)
       setFilaments(f)
       setPrinters(p)
+      if (p.length > 0) {
+        setAddForm((prev) => ({ ...prev, printerId: p[0].id }))
+      }
     }).finally(() => setLoading(false))
   }, [])
 
@@ -878,7 +881,7 @@ export default function Models() {
                   value={editForm.printerId}
                   onChange={(e) => setEditForm({ ...editForm, printerId: e.target.value })}
                 >
-                  <option value="">Auto (first printer or 200W default)</option>
+                  {farmPrinters.length === 0 && <option value="">Auto (200W default)</option>}
                   {farmPrinters.map((p) => (
                     <option key={p.id} value={p.id}>{p.brand} {p.model}</option>
                   ))}
@@ -1855,7 +1858,7 @@ export default function Models() {
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">Printer</label>
             <select className={selectClasses} value={addForm.printerId} onChange={(e) => setAddForm({ ...addForm, printerId: e.target.value })}>
-              <option value="">Auto (first printer or 200W default)</option>
+              {printers.length === 0 && <option value="">Auto (200W default)</option>}
               {printers.map((p) => (<option key={p.id} value={p.id}>{p.brand} {p.model} ({p.powerConsumption}W)</option>))}
             </select>
           </div>
